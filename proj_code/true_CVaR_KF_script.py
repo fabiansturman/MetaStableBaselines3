@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 device = 'cpu'# 'cuda' #  #doing cpu as A2C with MlpPolicy (rather than CNNpolicy) in stablebaseline is faster on CPU, and the meta gradinet beign faster on GPU (even if it is) is not *that* much faster - it is about two(ish) times slower overall based on one run each with two meta iterations, so better on cpu in this case
 torch.set_default_device(device)
 #################################################################
-model_save_path = "saved_models/14May25_1_metalearningKD_robust"
+model_save_path = "saved_models/14May25_2_metalearningKD_robust"
 
 import os
 os.mkdir(model_save_path)
@@ -37,7 +37,7 @@ adapt_lr =  7e-4
 meta_lr = 0.0005 
 
 meta_iterations = 10#500#1250
-tasks_per_loop = 40#60
+tasks_per_loop = 60
 adapt_timesteps = 32*4 #for this enviornment, each episode is exactly 32 timesteps, so multiple of 32 means full number of eps experienced for each task
 M = 5 #number of sampled adapted policies for each task (to see quality of meta parameters for this task in terms of mean performance, for more reliable targetting of dangerous tasks)
 
@@ -185,6 +185,7 @@ for meta_it in tqdm(range(meta_iterations)):
         fig, ax = plt.subplots()
         ax = env.unwrapped.show_state(ax)    
         plt.savefig(f"{model_save_path}/training{meta_it}")
+        plt.clf()
 
         #Save meta model
         torch.save(meta_agent.policy.state_dict(), f"{model_save_path}/meta_it_{meta_it}")
@@ -201,12 +202,14 @@ plt.xlabel('Meta learning steps')
 plt.ylabel('Validation loss')
 plt.title('Meta learning curve - loss')
 plt.savefig(f"{model_save_path}/trainingLossCurve")
+plt.clf()
 
 plt.plot(xs, meta_rets)
 plt.xlabel('Meta learning steps')
 plt.ylabel('Validation return')
 plt.title('Meta learning curve - return')
 plt.savefig(f"{model_save_path}/trainingReturnCurve")
+plt.clf()
 #################################################################
 print("Loading in model")
 loaded_meta_agent = A2C("MlpPolicy", env, verbose=0, meta_learning=True, learning_rate=adapt_lr, device=device)
@@ -234,4 +237,5 @@ for t in tqdm(range(dim*dim)):
     
 plt.tight_layout()
 plt.savefig(f"{model_save_path}/finalQualititativeEvaluation")
+plt.clf()
 
