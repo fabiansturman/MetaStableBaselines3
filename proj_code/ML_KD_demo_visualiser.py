@@ -89,4 +89,4 @@ for t in tqdm(range(dim*dim)):
     axs[x,y].set_axis_off()
     
 plt.tight_layout()
-plt.savefig(f"{model_save_path}_finalSummaryView")
+plt.savefig(f"finalSummaryView")
