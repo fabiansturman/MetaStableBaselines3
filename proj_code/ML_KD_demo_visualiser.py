@@ -21,7 +21,7 @@ torch.set_default_device(device)
 
 ##################################################################################
 
-model_save_path = "saved_models\\metalearningKD_13_expbonus1_bridgebonusfactor2"
+model_save_path = "saved_models/metalearningKD_13_expbonus1_bridgebonusfactor2"
 
 ##################################################################################
 ##Set up for meta learning
@@ -63,7 +63,7 @@ loaded_meta_agent = A2C("MlpPolicy", env, verbose=0, meta_learning=True, learnin
 
 #loaded_meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}\\meta_it_{495}", weights_only=True)) 
 
-loaded_meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}\\final_model", weights_only=True)) 
+loaded_meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}/final_model", weights_only=True)) 
 
 
     #can also load in intermediate saved envs from training
