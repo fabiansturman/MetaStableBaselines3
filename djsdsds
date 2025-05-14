@@ -1,0 +1,608 @@
+[1mdiff --git a/Miniconda3-py39_4.12.0-Linux-x86_64.sh b/Miniconda3-py39_4.12.0-Linux-x86_64.sh[m
+[1mnew file mode 100755[m
+[1mindex 0000000..71dda18[m
+[1m--- /dev/null[m
+[1m+++ b/Miniconda3-py39_4.12.0-Linux-x86_64.sh[m
+[36m@@ -0,0 +1,293693 @@[m
+[32m+[m[32m#!/bin/sh[m
+[32m+[m[32m#[m
+[32m+[m[32m# NAME:  Miniconda3[m
+[32m+[m[32m# VER:   py39_4.12.0[m
+[32m+[m[32m# PLAT:  linux-64[m
+[32m+[m[32m# LINES: 595[m
+[32m+[m[32m# MD5:   0c82c9dd531785b1ca2af7f6b1c29523[m
+[32m+[m
+[32m+[m[32mexport OLD_LD_LIBRARY_PATH=$LD_LIBRARY_PATH[m
+[32m+[m[32munset LD_LIBRARY_PATH[m
+[32m+[m[32mif ! echo "$0" | grep '\.sh$' > /dev/null; then[m
+[32m+[m[32m    printf 'Please run using "bash" or "sh", but not "." or "source"\\n' >&2[m
+[32m+[m[32m    return 1[m
+[32m+[m[32mfi[m
+[32m+[m
+[32m+[m[32m# Determine RUNNING_SHELL; if SHELL is non-zero use that.[m
+[32m+[m[32mif [ -n "$SHELL" ]; then[m
+[32m+[m[32m    RUNNING_SHELL="$SHELL"[m
+[32m+[m[32melse[m
+[32m+[m[32m    if [ "$(uname)" = "Darwin" ]; then[m
+[32m+[m[32m        RUNNING_SHELL=/bin/bash[m
+[32m+[m[32m    else[m
+[32m+[m[32m        if [ -d /proc ] && [ -r /proc ] && [ -d /proc/$$ ] && [ -r /proc/$$ ] && [ -L /proc/$$/exe ] && [ -r /proc/$$/exe ]; then[m
+[32m+[m[32m            RUNNING_SHELL=$(readlink /proc/$$/exe)[m
+[32m+[m[32m        fi[m
+[32m+[m[32m        if [ -z "$RUNNING_SHELL" ] || [ ! -f "$RUNNING_SHELL" ]; then[m
+[32m+[m[32m            RUNNING_SHELL=$(ps -p $$ -o args= | sed 's|^-||')[m
+[32m+[m[32m            case "$RUNNING_SHELL" in[m
+[32m+[m[32m                */*)[m
+[32m+[m[32m                    ;;[m
+[32m+[m[32m                default)[m
+[32m+[m[32m                    RUNNING_SHELL=$(which "$RUNNING_SHELL")[m
+[32m+[m[32m                    ;;[m
+[32m+[m[32m            esac[m
+[32m+[m[32m        fi[m
+[32m+[m[32m    fi[m
+[32m+[m[32mfi[m
+[32m+[m
+[32m+[m[32m# Some final fallback locations[m
+[32m+[m[32mif [ -z "$RUNNING_SHELL" ] || [ ! -f "$RUNNING_SHELL" ]; then[m
+[32m+[m[32m    if [ -f /bin/bash ]; then[m
+[32m+[m[32m        RUNNING_SHELL=/bin/bash[m
+[32m+[m[32m    else[m
+[32m+[m[32m        if [ -f /bin/sh ]; then[m
+[32m+[m[32m            RUNNING_SHELL=/bin/sh[m
+[32m+[m[32m        fi[m
+[32m+[m[32m    fi[m
+[32m+[m[32mfi[m
+[32m+[m
+[32m+[m[32mif [ -z "$RUNNING_SHELL" ] || [ ! -f "$RUNNING_SHELL" ]; then[m
+[32m+[m[32m    printf 'Unable to determine your shell. Please set the SHELL env. var and re-run\\n' >&2[m
+[32m+[m[32m    exit 1[m
+[32m+[m[32mfi[m
+[32m+[m
+[32m+[m[32mTHIS_DIR=$(DIRNAME=$(dirname "$0"); cd "$DIRNAME"; pwd)[m
+[32m+[m[32mTHIS_FILE=$(basename "$0")[m
+[32m+[m[32mTHIS_PATH="$THIS_DIR/$THIS_FILE"[m
+[32m+[m[32mPREFIX=$HOME/miniconda3[m
+[32m+[m[32mBATCH=0[m
+[32m+[m[32mFORCE=0[m
+[32m+[m[32mSKIP_SCRIPTS=0[m
+[32m+[m[32mTEST=0[m
+[32m+[m[32mREINSTALL=0[m
+[32m+[m[32mUSAGE="[m
+[32m+[m[32musage: $0 [options][m
+[32m+[m
+[32m+[m[32mInstalls Miniconda3 py39_4.12.0[m
+[32m+[m
+[32m+[m[32m-b           run install in batch mode (without manual intervention),[m
+[32m+[m[32m             it is expected the license terms are agreed upon[m
+[32m+[m[32m-f           no error if install prefix already exists[m
+[32m+[m[32m-h           print this help message and exit[m
+[32m+[m[32m-p PREFIX    install prefix, defaults to $PREFIX, must not contain spaces.[m
+[32m+[m[32m-s           skip running pre/post-link/install scripts[m
+[32m+[m[32m-u           update an existing installation[m
+[32m+[m[32m-t           run package tests after installation (may install conda-build)[m
+[32m+[m[32m"[m
+[32m+[m
+[32m+[m[32mif which getopt > /dev/null 2>&1; then[m
+[32m+[m[32m    OPTS=$(getopt bfhp:sut "$*" 2>/dev/null)[m
+[32m+[m[32m    if [ ! $? ]; then[m
+[32m+[m[32m        printf "%s\\n" "$USAGE"[m
+[32m+[m[32m        exit 2[m
+[32m+[m[32m    fi[m
+[32m+[m
+[32m+[m[32m    eval set -- "$OPTS"[m
+[32m+[m
+[32m+[m[32m    while true; do[m
+[32m+[m[32m        case "$1" in[m
+[32m+[m[32m            -h)[m
+[32m+[m[32m                printf "%s\\n" "$USAGE"[m
+[32m+[m[32m                exit 2[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            -b)[m
+[32m+[m[32m                BATCH=1[m
+[32m+[m[32m                shift[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            -f)[m
+[32m+[m[32m                FORCE=1[m
+[32m+[m[32m                shift[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            -p)[m
+[32m+[m[32m                PREFIX="$2"[m
+[32m+[m[32m                shift[m
+[32m+[m[32m                shift[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            -s)[m
+[32m+[m[32m                SKIP_SCRIPTS=1[m
+[32m+[m[32m                shift[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            -u)[m
+[32m+[m[32m                FORCE=1[m
+[32m+[m[32m                shift[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            -t)[m
+[32m+[m[32m                TEST=1[m
+[32m+[m[32m                shift[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            --)[m
+[32m+[m[32m                shift[m
+[32m+[m[32m                break[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            *)[m
+[32m+[m[32m                printf "ERROR: did not recognize option '%s', please try -h\\n" "$1"[m
+[32m+[m[32m                exit 1[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m        esac[m
+[32m+[m[32m    done[m
+[32m+[m[32melse[m
+[32m+[m[32m    while getopts "bfhp:sut" x; do[m
+[32m+[m[32m        case "$x" in[m
+[32m+[m[32m            h)[m
+[32m+[m[32m                printf "%s\\n" "$USAGE"[m
+[32m+[m[32m                exit 2[m
+[32m+[m[32m            ;;[m
+[32m+[m[32m            b)[m
+[32m+[m[32m                BATCH=1[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            f)[m
+[32m+[m[32m                FORCE=1[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            p)[m
+[32m+[m[32m                PREFIX="$OPTARG"[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            s)[m
+[32m+[m[32m                SKIP_SCRIPTS=1[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            u)[m
+[32m+[m[32m                FORCE=1[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            t)[m
+[32m+[m[32m                TEST=1[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            ?)[m
+[32m+[m[32m                printf "ERROR: did not recognize option '%s', please try -h\\n" "$x"[m
+[32m+[m[32m                exit 1[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m        esac[m
+[32m+[m[32m    done[m
+[32m+[m[32mfi[m
+[32m+[m
+[32m+[m[32mdetermine_glibc () {[m
+[32m+[m[32m    # first parameter is min version; default minimum version to current x86_64[m
+[32m+[m[32m    minimum_glibc_version=${1:-"2.17"}[m
+[32m+[m[32m    # ldd seems to be consistent in that the version is always at the end after the last space.[m
+[32m+[m[32m    # check that system_glibc is set to a meaningful value, e.g., 2.12, 2.17, 2.31, ...[m
+[32m+[m[32m    system_glibc=$(ldd --version 2> /dev/null | head -n1 | awk '$NF ~ /^[0-9]+\.[0-9]+$/ {print $NF}')[m
+[32m+[m[32m    if [ -n "${system_glibc}" ]; then[m
+[32m+[m[32m        if [ "$(printf "${minimum_glibc_version}\n${system_glibc}\n" | sort -V | head -n1)" != "${minimum_glibc_version}" ]; then[m
+[32m+[m[32m            printf "WARNING:\\n"[m
+[32m+[m[32m            printf "    The installer is not compatible with the version of the Linux distribution\\n"[m
+[32m+[m[32m            printf "    installed on your system. The version of GLIBC is no longer supported.\\n"[m
+[32m+[m[32m            printf "    Found version ${system_glibc}, which is less than ${minimum_glibc_version}\\n"[m
+[32m+[m[32m            printf "Aborting installation.\\n"[m
+[32m+[m[32m            exit 2[m
+[32m+[m[32m        fi[m
+[32m+[m[32m    fi[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mif [ "$BATCH" = "0" ] # interactive mode[m
+[32m+[m[32mthen[m
+[32m+[m[32m    determine_glibc "2.17"[m
+[32m+[m[32m    if [ "$(uname -m)" != "x86_64" ]; then[m
+[32m+[m[32m        printf "WARNING:\\n"[m
+[32m+[m[32m        printf "    Your operating system appears not to be 64-bit, but you are trying to\\n"[m
+[32m+[m[32m        printf "    install a 64-bit version of Miniconda3.\\n"[m
+[32m+[m[32m        printf "    Are sure you want to continue the installation? [yes|no]\\n"[m
+[32m+[m[32m        printf "[no] >>> "[m
+[32m+[m[32m        read -r ans[m
+[32m+[m[32m        if [ "$ans" != "yes" ] && [ "$ans" != "Yes" ] && [ "$ans" != "YES" ] && \[m
+[32m+[m[32m           [ "$ans" != "y" ]   && [ "$ans" != "Y" ][m
+[32m+[m[32m        then[m
+[32m+[m[32m            printf "Aborting installation\\n"[m
+[32m+[m[32m            exit 2[m
+[32m+[m[32m        fi[m
+[32m+[m[32m    fi[m
+[32m+[m[32m    if [ "$(uname)" != "Linux" ]; then[m
+[32m+[m[32m        printf "WARNING:\\n"[m
+[32m+[m[32m        printf "    Your operating system does not appear to be Linux, \\n"[m
+[32m+[m[32m        printf "    but you are trying to install a Linux version of Miniconda3.\\n"[m
+[32m+[m[32m        printf "    Are sure you want to continue the installation? [yes|no]\\n"[m
+[32m+[m[32m        printf "[no] >>> "[m
+[32m+[m[32m        read -r ans[m
+[32m+[m[32m        if [ "$ans" != "yes" ] && [ "$ans" != "Yes" ] && [ "$ans" != "YES" ] && \[m
+[32m+[m[32m           [ "$ans" != "y" ]   && [ "$ans" != "Y" ][m
+[32m+[m[32m        then[m
+[32m+[m[32m            printf "Aborting installation\\n"[m
+[32m+[m[32m            exit 2[m
+[32m+[m[32m        fi[m
+[32m+[m[32m    fi[m
+[32m+[m[32m    printf "\\n"[m
+[32m+[m[32m    printf "Welcome to Miniconda3 py39_4.12.0\\n"[m
+[32m+[m[32m    printf "\\n"[m
+[32m+[m[32m    printf "In order to continue the installation process, please review the license\\n"[m
+[32m+[m[32m    printf "agreement.\\n"[m
+[32m+[m[32m    printf "Please, press ENTER to continue\\n"[m
+[32m+[m[32m    printf ">>> "[m
+[32m+[m[32m    read -r dummy[m
+[32m+[m[32m    pager="cat"[m
+[32m+[m[32m    if command -v "more" > /dev/null 2>&1; then[m
+[32m+[m[32m      pager="more"[m
+[32m+[m[32m    fi[m
+[32m+[m[32m    "$pager" <<EOF[m
+[32m+[m[32m======================================[m
+[32m+[m[32mEnd User License Agreement - Miniconda[m
+[32m+[m[32m======================================[m
+[32m+[m
+[32m+[m[32mCopyright 2015-2022, Anaconda, Inc.[m
+[32m+[m
+[32m+[m[32mAll rights reserved under the 3-clause BSD License:[m
+[32m+[m
+[32m+[m[32mThis End User License Agreement (the "Agreement") is a legal agreement between you and Anaconda, Inc. ("Anaconda") and governs your use of Miniconda.[m
+[32m+[m
+[32m+[m[32mSubject to the terms of this Agreement, Anaconda hereby grants you a non-exclusive, non-transferable license to:[m
+[32m+[m
+[32m+[m[32m  * Install and use the Miniconda,[m
+[32m+[m[32m  * Modify and create derivative works of sample source code delivered in Miniconda subject to the Terms of Service for the Repository (as defined hereinafter) available at https://www.anaconda.com/terms-of-service, and[m
+[32m+[m[32m  * Redistribute code files in source (if provided to you by Anaconda as source) and binary forms, with or without modification subject to the requirements set forth below.[m
+[32m+[m
+[32m+[m[32mAnaconda may, at its option, make available patches, workarounds or other updates to Miniconda. Unless the updates are provided with their separate governing terms, they are deemed part of Miniconda licensed to you as provided in this Agreement. This Agreement does not entitle you to any support for Miniconda.[m
+[32m+[m
+[32m+[m[32mAnaconda reserves all rights not expressly granted to you in this Agreement.[m
+[32m+[m
+[32m+[m[32mRedistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:[m
+[32m+[m
+[32m+[m[32m  * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.[m
+[32m+[m[32m  * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.[m
+[32m+[m[32m  * Neither the name of Anaconda nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.[m
+[32m+[m
+[32m+[m[32mYou acknowledge that, as between you and Anaconda, Anaconda owns all right, title, and interest, including all intellectual property rights, in and to Miniconda and, with respect to third-party products distributed with or through Miniconda, the applicable third-party licensors own all right, title and interest, including all intellectual property rights, in and to such products. If you send or transmit any communications or materials to Anaconda suggesting or recommending changes to the software or documentation, including without limitation, new features or functionality relating thereto, or any comments, questions, suggestions or the like ("Feedback"), Anaconda is free to use such Feedback. You hereby assign to Anaconda all right, title, and interest in, and Anaconda is free to use, without any attribution or compensation to any party, any ideas, know-how, concepts, techniques or other intellectual property rights contained in the Feedback, for any purpose whatsoever, although Anaconda is not required to use any Feedback.[m
+[32m+[m
+[32m+[m[32mDISCLAIMER[m
+[32m+[m[32m==========[m
+[32m+[m
+[32m+[m[32mTHIS SOFTWARE IS PROVIDED BY ANACONDA AND ITS CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL ANACONDA BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.[m
+[32m+[m
+[32m+[m[32mTO THE MAXIMUM EXTENT PERMITTED BY LAW, ANACONDA AND ITS AFFILIATES SHALL NOT BE LIABLE FOR ANY SPECIAL, INCIDENTAL, PUNITIVE OR CONSEQUENTIAL DAMAGES, OR ANY LOST PROFITS, LOSS OF USE, LOSS OF DATA OR LOSS OF GOODWILL, OR THE COSTS OF PROCURING SUBSTITUTE PRODUCTS, ARISING OUT OF OR IN CONNECTION WITH THIS AGREEMENT OR THE USE OR PERFORMANCE OF MINICONDA, WHETHER SUCH LIABILITY ARISES FROM ANY CLAIM BASED UPON BREACH OF CONTRACT, BREACH OF WARRANTY, TORT (INCLUDING NEGLIGENCE), PRODUCT LIABILITY OR ANY OTHER CAUSE OF ACTION OR THEORY OF LIABILITY. IN NO EVENT WILL THE TOTAL CUMULATIVE LIABILITY OF ANACONDA AND ITS AFFILIATES UNDER OR ARISING OUT OF THIS AGREEMENT EXCEED US$10.00.[m
+[32m+[m
+[32m+[m[32mMiscellaneous[m
+[32m+[m[32m=============[m
+[32m+[m
+[32m+[m[32mIf you want to terminate this Agreement, you may do so by discontinuing use of Miniconda. Anaconda may, at any time, terminate this Agreement and the license granted hereunder if you fail to comply with any term of this Agreement. Upon any termination of this Agreement, you agree to promptly discontinue use of the Miniconda and destroy all copies in your possession or control. Upon any termination of this Agreement all provisions survive except for the licenses granted to you.[m
+[32m+[m
+[32m+[m[32mThis Agreement is governed by and construed in accordance with the internal laws of the State of Texas without giving effect to any choice or conflict of law provision or rule that would require or permit the application of the laws of any jurisdiction other than those of the State of Texas. Any legal suit, action, or proceeding arising out of or related to this Agreement or the licenses granted hereunder by you must be instituted exclusively in the federal courts of the United States or the courts of the State of Texas in each case located in Travis County, Texas, and you irrevocably submit to the jurisdiction of such courts in any such suit, action, or proceeding.[m
+[32m+[m
+[32m+[m[32mNotice of Third Party Software Licenses[m
+[32m+[m[32m=======================================[m
+[32m+[m
+[32m+[m[32mMiniconda provides access to a repository (the "Repository") which contains software packages or tools licensed on an open source basis from third parties and binary packages of these third party tools. These third party software packages or tools are provided on an "as is" basis and are subject to their respective license agreements as well as this Agreement and the Terms of Service for the Repository located at https://www.anaconda.com/terms-of-service; provided, however, no restriction contained in the Terms of Service shall be construed so as to limit Your ability to download the packages contained in Miniconda provided you comply with the license for each such package. These licenses may be accessed from within the Miniconda software[1] or https://www.anaconda.com/legal. Information regarding which license is applicable is available from within many of the third party software packages and tools and at https://repo.anaconda.com/pkgs/main/ and https://repo.anaconda.com/pkgs/r/. Anaconda reserves the right, in its sole discretion, to change which third party tools are included in the Repository accessible through Miniconda.[m
+[32m+[m
+[32m+[m
+[32m+[m[32mIntel Math Kernel Library[m
+[32m+[m[32m-------------------------[m
+[32m+[m
+[32m+[m[32mMiniconda provides access to re-distributable, run-time, shared-library files from the Intel Math Kernel Library ("MKL binaries").[m
+[32m+[m
+[32m+[m[32mCopyright 2018 Intel Corporation. License available at https://software.intel.com/en-us/license/intel-simplified-software-license (the "MKL License").[m
+[32m+[m
+[32m+[m[32mYou may use and redistribute the MKL binaries, without modification, provided the following conditions are met:[m
+[32m+[m
+[32m+[m[32m  * Redistributions must reproduce the above copyright notice and the following terms of use in the MKL binaries and in the documentation and/or other materials provided with the distribution.[m
+[32m+[m[32m  * Neither the name of Intel nor the names of its suppliers may be used to endorse or promote products derived from the MKL binaries without specific prior written permission.[m
+[32m+[m[32m  * No reverse engineering, decompilation, or disassembly of the MKL binaries is permitted.[m
+[32m+[m
+[32m+[m[32mYou are specifically authorized to use and redistribute the MKL binaries with your installation of Miniconda subject to the terms set forth in the MKL License. You are also authorized to redistribute the MKL binaries with Miniconda or in the Anaconda package that contains the MKL binaries. If needed, instructions for removing the MKL binaries after installation of Miniconda are available at https://docs.anaconda.com.[m
+[32m+[m
+[32m+[m[32mcuDNN Software[m
+[32m+[m[32m--------------[m
+[32m+[m
+[32m+[m[32mMiniconda also provides access to cuDNN software binaries ("cuDNN binaries") from NVIDIA Corporation. You are specifically authorized to use the cuDNN binaries with your installation of Miniconda subject to your compliance with the license agreement located at https://docs.nvidia.com/deeplearning/sdk/cudnn-sla/index.html. You are also authorized to redistribute the cuDNN binaries with an Miniconda package that contains the cuDNN binaries. You can add or remove the cuDNN binaries utilizing the install and uninstall features in Miniconda.[m
+[32m+[m
+[32m+[m[32mcuDNN binaries contain source code provided by NVIDIA Corporation.[m
+[32m+[m
+[32m+[m[32mArm Performance Libraries[m
+[32m+[m[32m-------------------------[m
+[32m+[m
+[32m+[m[32mArm Performance Libraries (Free Version): Anaconda provides access to software and related documentation from the Arm Performance Libraries ("Arm PL") provided by Arm Limited. By installing or otherwise accessing the Arm PL, you acknowledge and agree that use and distribution of the Arm PL is subject to your compliance with the Arm PL end user license agreement located at: https://developer.arm.com/tools-and-software/server-and-hpc/downloads/arm-performance-libraries/eula.[m
+[32m+[m
+[32m+[m[32mExport; Cryptography Notice[m
+[32m+[m[32m===========================[m
+[32m+[m
+[32m+[m[32mYou must comply with all domestic and international export laws and regulations that apply to the software, which include restrictions on destinations, end users, and end use. Miniconda includes cryptographic software. The country in which you currently reside may have restrictions on the import, possession, use, and/or re-export to another country, of encryption software. BEFORE using any encryption software, please check your country's laws, regulations and policies concerning the import, possession, or use, and re-export of encryption software, to see if this is permitted. See the Wassenaar Arrangement http://www.wassenaar.org/ for more information.[m
+[32m+[m
+[32m+[m[32mAnaconda has self-classified this software as Export Commodity Control Number (ECCN) EAR99, which includes mass market information security software using or performing cryptographic functions with asymmetric algorithms. No license is required for export of this software to non-embargoed countries.[m
+[32m+[m
+[32m+[m[32mThe Intel Math Kernel Library contained in Miniconda is classified by Intel as ECCN 5D992.c with no license required for export to non-embargoed countries.[m
+[32m+[m
+[32m+[m[32mThe following packages listed on https://www.anaconda.com/cryptography are included in the Repository accessible through Miniconda that relate to cryptography.[m
+[32m+[m
+[32m+[m[32mLast updated March 21, 2022[m
+[32m+[m[32mEOF[m
+[32m+[m[32m    printf "\\n"[m
+[32m+[m[32m    printf "Do you accept the license terms? [yes|no]\\n"[m
+[32m+[m[32m    printf "[no] >>> "[m
+[32m+[m[32m    read -r ans[m
+[32m+[m[32m    while [ "$ans" != "yes" ] && [ "$ans" != "Yes" ] && [ "$ans" != "YES" ] && \[m
+[32m+[m[32m          [ "$ans" != "no" ]  && [ "$ans" != "No" ]  && [ "$ans" != "NO" ][m
+[32m+[m[32m    do[m
+[32m+[m[32m        printf "Please answer 'yes' or 'no':'\\n"[m
+[32m+[m[32m        printf ">>> "[m
+[32m+[m[32m        read -r ans[m
+[32m+[m[32m    done[m
+[32m+[m[32m    if [ "$ans" != "yes" ] && [ "$ans" != "Yes" ] && [ "$ans" != "YES" ][m
+[32m+[m[32m    then[m
+[32m+[m[32m        printf "The license agreement wasn't approved, aborting installation.\\n"[m
+[32m+[m[32m        exit 2[m
+[32m+[m[32m    fi[m
+[32m+[m[32m    printf "\\n"[m
+[32m+[m[32m    printf "Miniconda3 will now be installed into this location:\\n"[m
+[32m+[m[32m    printf "%s\\n" "$PREFIX"[m
+[32m+[m[32m    printf "\\n"[m
+[32m+[m[32m    printf "  - Press ENTER to confirm the location\\n"[m
+[32m+[m[32m    printf "  - Press CTRL-C to abort the installation\\n"[m
+[32m+[m[32m    printf "  - Or specify a different location below\\n"[m
+[32m+[m[32m    printf "\\n"[m
+[32m+[m[32m    printf "[%s] >>> " "$PREFIX"[m
+[32m+[m[32m    read -r user_prefix[m
+[32m+[m[32m    if [ "$user_prefix" != "" ]; then[m
+[32m+[m[32m        case "$user_prefix" in[m
+[32m+[m[32m            *\ * )[m
+[32m+[m[32m                printf "ERROR: Cannot install into directories with spaces\\n" >&2[m
+[32m+[m[32m                exit 1[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m            *)[m
+[32m+[m[32m                eval PREFIX="$user_prefix"[m
+[32m+[m[32m                ;;[m
+[32m+[m[32m        esac[m
+[32m+[m[32m    fi[m
+[32m+[m[32mfi # !BATCH[m
+[32m+[m
+[32m+[m[32mcase "$PREFIX" in[m
+[32m+[m[32m    *\ * )[m
+[32m+[m[32m        printf "ERROR: Cannot install into directories with spaces\\n" >&2[m
+[32m+[m[32m        exit 1[m
+[32m+[m[32m        ;;[m
+[32m+[m[32mesac[m
+[32m+[m
+[32m+[m[32mif [ "$FORCE" = "0" ] && [ -e "$PREFIX" ]; then[m
+[32m+[m[32m    printf "ERROR: File or directory already exists: '%s'\\n" "$PREFIX" >&2[m
+[32m+[m[32m    printf "If you want to update an existing installation, use the -u option.\\n" >&2[m
+[32m+[m[32m    exit 1[m
+[32m+[m[32melif [ "$FORCE" = "1" ] && [ -e "$PREFIX" ]; then[m
+[32m+[m[32m    REINSTALL=1[m
+[32m+[m[32mfi[m
+[32m+[m
+[32m+[m
+[32m+[m[32mif ! mkdir -p "$PREFIX"; then[m
+[32m+[m[32m    printf "ERROR: Could not create directory: '%s'\\n" "$PREFIX" >&2[m
+[32m+[m[32m    exit 1[m
+[32m+[m[32mfi[m
+[32m+[m
+[32m+[m[32mPREFIX=$(cd "$PREFIX"; pwd)[m
+[32m+[m[32mexport PREFIX[m
+[32m+[m
+[32m+[m[32mprintf "PREFIX=%s\\n" "$PREFIX"[m
+[32m+[m
+[32m+[m[32m# verify the MD5 sum of the tarball appended to this header[m
+[32m+[m[32mMD5=$(tail -n +595 "$THIS_PATH" | md5sum -)[m
+[32m+[m[32mif ! echo "$MD5" | grep 0c82c9dd531785b1ca2af7f6b1c29523 >/dev/null; then[m
+[32m+[m[32m    printf "WARNING: md5sum mismatch of tar archive\\n" >&2[m
+[32m+[m[32m    printf "expected: 0c82c9dd531785b1ca2af7f6b1c29523\\n" >&2[m
+[32m+[m[32m    printf "     got: %s\\n" "$MD5" >&2[m
+[32m+[m[32mfi[m
+[32m+[m
+[32m+[m[32m# extract the tarball appended to this header, this creates the *.tar.bz2 files[m
+[32m+[m[32m# for all the packages which get installed below[m
+[32m+[m[32mcd "$PREFIX"[m
+[32m+[m
+[32m+[m[32m# disable sysconfigdata overrides, since we want whatever was frozen to be used[m
+[32m+[m[32munset PYTHON_SYSCONFIGDATA_NAME _CONDA_PYTHON_SYSCONFIGDATA_NAME[m
+[32m+[m
+[32m+[m[32mCONDA_EXEC="$PREFIX/conda.exe"[m
+[32m+[m[32m# 3-part dd from https://unix.stackexchange.com/a/121798/34459[m
+[32m+[m[32m# this is similar below with the tarball payload - see shar.py in constructor to see how[m
+[32m+[m[32m#    these values are computed.[m
+[32m+[m[32m{[m
+[32m+[m[32m    dd if="$THIS_PATH" bs=1 skip=27805                  count=4963                      2>/dev/null[m
+[32m+[m[32m    dd if="$THIS_PATH" bs=16384        skip=2                      count=977                   2>/dev/null[m
+[32m+[m[32m    dd if="$THIS_PATH" bs=1 skip=16039936                   count=16357                   2>/dev/null[m
+[32m+[m[32m} > "$CONDA_EXEC"[m
+[32m+[m
+[32m+[m[32mchmod +x "$CONDA_EXEC"[m
+[32m+[m
+[32m+[m[32mexport TMP_BACKUP="$TMP"[m
+[32m+[m[32mexport TMP=$PREFIX/install_tmp[m
+[32m+[m
+[32m+[m[32mprintf "Unpacking payload ...\n"[m
+[32m+[m[32m{[m
+[32m+[m[32m    dd if="$THIS_PATH" bs=1 skip=16056293               count=27                        2>/dev/null[m
+[32m+[m[32m    dd if="$THIS_PATH" bs=16384        skip=980                    count=3695                  2>/dev/null[m
+[32m+[m[32m    dd if="$THIS_PATH" bs=1 skip=76595200                   count=12478                   2>/dev/null[m
+[32m+[m[32m} | "$CONDA_EXEC" constructor --extract-tar --prefix "$PREFIX"[m
+[32m+[m
+[32m+[m[32m"$CONDA_EXEC" constructor --prefix "$PREFIX" --extract-conda-pkgs || exit 1[m
+[32m+[m
+[32m+[m[32mPRECONDA="$PREFIX/preconda.tar.bz2"[m
+[32m+[m[32m"$CONDA_EXEC" constructor --prefix "$PREFIX" --extract-tarball < "$PRECONDA" || exit 1[m
+[32m+[m[32mrm -f "$PRECONDA"[m
+[32m+[m
+[32m+[m[32mPYTHON="$PREFIX/bin/python"[m
+[32m+[m[32mMSGS="$PREFIX/.messages.txt"[m
+[32m+[m[32mtouch "$MSGS"[m
+[32m+[m[32mexport FORCE[m
+[32m+[m
+[32m+[m[32m# original issue report:[m
+[32m+[m[32m# https://github.com/ContinuumIO/anaconda-issues/issues/11148[m
+[32m+[m[32m# First try to fix it (this apparently didn't work; QA reported the issue again)[m
+[32m+[m[32m# https://github.com/conda/conda/pull/9073[m
+[32m+[m[32mmkdir -p ~/.conda > /dev/null 2>&1[m
+[32m+[m
+[32m+[m[32mCONDA_SAFETY_CHECKS=disabled \[m
+[32m+[m[32mCONDA_EXTRA_SAFETY_CHECKS=no \[m
+[32m+[m[32mCONDA_ROLLBACK_ENABLED=no \[m
+[32m+[m[32mCONDA_CHANNELS=https://repo.anaconda.com/pkgs/main,https://repo.anaconda.com/pkgs/main,https://repo.anaconda.com/pkgs/r,https://repo.anaconda.com/pkgs/pro \[m
+[32m+[m[32mCONDA_PKGS_DIRS="$PREFIX/pkgs" \[m
+[32m+[m[32m"$CONDA_EXEC" install --offline --file "$PREFIX/pkgs/env.txt" -yp "$PREFIX" || exit 1[m
+[32m+[m
+[32m+[m
+[32m+[m
+[32m+[m[32mPOSTCONDA="$PREFIX/postconda.tar.bz2"[m
+[32m+[m[32m"$CONDA_EXEC" constructor --prefix "$PREFIX" --extract-tarball < "$POSTCONDA" || exit 1[m
+[32m+[m[32mrm -f "$POSTCONDA"[m
+[32m+[m
+[32m+[m[32mrm -f $PREFIX/conda.exe[m
+[32m+[m[32mrm -f $PREFIX/pkgs/env.txt[m
+[32m+[m
+[32m+[m[32mrm -rf $PREFIX/install_tmp[m
+[32m+[m[32mexport TMP="$TMP_BACKUP"[m
+[32m+[m
+[32m+[m[32mmkdir -p $PREFIX/envs[m
+[32m+[m
+[32m+[m[32mif [ -f "$MSGS" ]; then[m
+[32m+[m[32m  cat "$MSGS"[m
+[32m+[m[32mfi[m
+[32m+[m[32mrm -f "$MSGS"[m
+[32m+[m[32m# handle .aic files[m
+[32m+[m[32m$PREFIX/bin/python -E -s "$PREFIX/pkgs/.cio-config.py" "$THIS_PATH" || exit 1[m
+[32m+[m[32mprintf "installation finished.\\n"[m
+[32m+[m
+[32m+[m[32mif [ "$PYTHONPATH" != "" ]; then[m
+[32m+[m[32m    printf "WARNING:\\n"[m
+[32m+[m[32m    printf "    You currently have a PYTHONPATH environment variable set. This may cause\\n"[m
+[32m+[m[32m    printf "    unexpected behavior when running the Python interpreter in Miniconda3.\\n"[m
+[32m+[m[32m    printf "    For best results, please verify that your PYTHONPATH only points to\\n"[m
+[32m+[m[32m    printf "    directories of packages that are compatible with the Python interpreter\\n"[m
+[32m+[m[32m    printf "    in Miniconda3: $PREFIX\\n"[m
+[32m+[m[32mfi[m
+[32m+[m
+[32m+[m[32mif [ "$BATCH" = "0" ]; then[m
+[32m+[m[32m    # Interactive mode.[m
+[32m+[m[32m    BASH_RC="$HOME"/.bashrc[m
+[32m+[m[32m    DEFAULT=no[m
+[32m+[m[32m    printf "Do you wish the installer to initialize Miniconda3\\n"[m
+[32m+[m[32m    printf "by running conda init? [yes|no]\\n"[m
+[32m+[m[32m    printf "[%s] >>> " "$DEFAULT"[m
+[32m+[m[32m    read -r ans[m
+[32m+[m[32m    if [ "$ans" = "" ]; then[m
+[32m+[m[32m        ans=$DEFAULT[m
+[32m+[m[32m    fi[m
+[32m+[m[32m    if [ "$ans" != "yes" ] && [ "$ans" != "Yes" ] && [ "$ans" != "YES" ] && \[m
+[32m+[m[32m       [ "$ans" != "y" ]   && [ "$ans" != "Y" ][m
+[32m+[m[32m    then[m
+[32m+[m[32m        printf "\\n"[m
+[32m+[m[32m        printf "You have chosen to not have conda modify your shell scripts at all.\\n"[m
+[32m+[m[32m        printf "To activate conda's base environment in your current shell session:\\n"[m
+[32m+[m[32m        printf "\\n"[m
+[32m+[m[32m        printf "eval \"\$($PREFIX/bin/conda shell.YOUR_SHELL_NAME hook)\" \\n"[m
+[32m+[m[32m        printf "\\n"[m
+[32m+[m[32m        printf "To install conda's shell functions for easier access, first activate, then:\\n"[m
+[32m+[m[32m        printf "\\n"[m
+[32m+[m[32m        printf "conda init\\n"[m
+[32m+[m[32m        printf "\\n"[m
+[32m+[m[32m    else[m
+[32m+[m[32m        case "${SHELL}" in[m
+[32m+[m[32m            *zsh)   "${PREFIX}"/bin/conda init zsh ;;[m
+[32m+[m[32m            *)      "${PREFIX}"/bin/conda init ;;[m
+[32m+[m[32m        esac[m
+[32m+[m[32m    fi[m
+[32m+[m[32m    printf "If you'd prefer that conda's base environment not be activated on startup, \\n"[m
+[32m+[m[32m    printf "   set the auto_activate_base parameter to false: \\n"[m
+[32m+[m[32m    printf "\\n"[m
+[32m+[m[32m    printf "conda config --set auto_activate_base false\\n"[m
+[32m+[m[32m    printf "\\n"[m
+[32m+[m
+[32m+[m[32m    printf "Thank you for installing Miniconda3!\\n"[m
+[32m+[m[32mfi # !BATCH[m
+[32m+[m
+[32m+[m[32mif [ "$TEST" = "1" ]; then[m
+[32m+[m[32m    printf "INFO: Running package tests in a subshell\\n"[m
+[32m+[m[32m    (. "$PREFIX"/bin/activate[m
+[32m+[m[32m     which conda-build > /dev/null 2>&1 || conda install -y conda-build[m
+[32m+[m[32m     if [ ! -d "$PREFIX"/conda-bld/linux-64 ]; then[m
+[32m+[m[32m         mkdir -p "$PREFIX"/conda-bld/linux-64[m
+[32m+[m[32m     fi[m
+[32m+[m[32m     cp -f "$PREFIX"/pkgs/*.tar.bz2 "$PREFIX"/conda-bld/linux-64/[m
+[32m+[m[32m     cp -f "$PREFIX"/pkgs/*.conda "$PREFIX"/conda-bld/linux-64/[m
+[32m+[m[32m     conda index "$PREFIX"/conda-bld/linux-64/[m
+[32m+[m[32m     test_failures=0[m
+[32m+[m[32m     failed_packages=""[m
+[32m+[m[32m     for test_package in $(ls "$PREFIX"/conda-bld/linux-64/*.conda)[m
+[32m+[m[32m     do[m
+[32m+[m[32m        conda-build --override-channels --channel local --test --keep-going ${test_package}[m
+[32m+[m[32m        ret_code=$?[m
+[32m+[m[32m        if [ ${ret_code} -ne 0 ]; then[m
+[32m+[m[32m            test_failures=$(($test_failures + 1))[m
+[32m+[m[32m            failed_packages="${failed_packages}${test_package} "[m
+[32m+[m[32m        fi[m
+[32m+[m[32m        conda-build purge[m
+[32m+[m[32m     done[m
+[32m+[m[32m     if [ ${test_failures} -ne 0 ]; then[m
+[32m+[m[32m        printf "Failed recipes:\\n"[m
+[32m+[m[32m        for failure in ${failed_packages}[m
+[32m+[m[32m        do[m
+[32m+[m[32m            printf "  - ${failure}\\n"[m
+[32m+[m[32m        done[m
+[32m+[m[32m     fi[m
+[32m+[m[32m     exit ${test_failures}[m
+[32m+[m[32m    )[m
+[32m+[m[32m    NFAILS=$?[m
+[32m+[m[32m    if [ "$NFAILS" != "0" ]; then[m
+[32m+[m[32m        if [ "$NFAILS" = "1" ]; then[m
+[32m+[m[32m            printf "ERROR: 1 test failed\\n" >&2[m
+[32m+[m[32m            printf "To re-run the tests for the above failed package, please enter:\\n"[m
+[32m+[m[32m            printf ". %s/bin/activate\\n" "$PREFIX"[m
+[32m+[m[32m            printf "conda-build --override-channels --channel local --test <full-path-to-failed.tar.bz2>\\n"[m
+[32m+[m[32m        else[m
+[32m+[m[32m            printf "ERROR: %s test failed\\n" $NFAILS >&2[m
+[32m+[m[32m            printf "To re-run the tests for the above failed packages, please enter:\\n"[m
+[32m+[m[32m            printf ". %s/bin/activate\\n" "$PREFIX"[m
+[32m+[m[32m            printf "conda-build --override-channels --channel local --test <full-path-to-failed.tar.bz2>\\n"[m
+[32m+[m[32m        fi[m
+[32m+[m[32m        exit $NFAILS[m
+[32m+[m[32m    fi[m
+[32m+[m[32mfi[m
+[32m+[m
+[32m+[m[32mif [ "$BATCH" = "0" ]; then[m
+[32m+[m[32m    if [ -f "$PREFIX/pkgs/vscode_inst.py" ]; then[m
+[32m+[m[32m      $PYTHON -E -s "$PREFIX/pkgs/vscode_inst.py" --is-supported[m
+[32m+[m[32m      if [ "$?" = "0" ]; then[m
+[32m+[m[32m          printf "\\n"[m
+[32m+[m[32m          printf "===========================================================================\\n"[m
+[32m+[m[32m          printf "\\n"[m
+[32m+[m[32m          printf "Anaconda is partnered with Microsoft! Microsoft VSCode is a streamlined\\n"[m
+[32m+[m[32m          printf "code editor with support for development operations like debugging, task\\n"[m
+[32m+[m[32m          printf "running and version control.\\n"[m
+[32m+[m[32m          printf "\\n"[m
+[32m+[m[32m          printf "To install Visual Studio Code, you will need:\\n"[m
+[32m+[m[32m          if [ "$(uname)" = "Linux" ]; then[m
+[32m+[m[32m              printf -- "  - Administrator Privileges\\n"[m
+[32m+[m[32m          fi[m
+[32m+[m[32m          printf -- "  - Internet connectivity\\n"[m
+[32m+[m[32m          printf "\\n"[m
+[32m+[m[32m          printf "Visual Studio Code License: https://code.visualstudio.com/license\\n"[m
+[32m+[m[32m          printf "\\n"[m
+[32m+[m[32m          printf "Do you wish to proceed with the installation of Microsoft VSCode? [yes|no]\\n"[m
+[32m+[m[32m          printf ">>> "[m
+[32m+[m[32m          read -r ans[m
+[32m+[m[32m          while [ "$ans" != "yes" ] && [ "$ans" != "Yes" ] && [ "$ans" != "YES" ] && \[m
+[32m+[m[32m                [ "$ans" != "no" ]  && [ "$ans" != "No" ]  && [ "$ans" != "NO" ][m
+[32m+[m[32m          do[m
+[32m+[m[32m              printf "Please answer 'yes' or 'no':\\n"[m
+[32m+[m[32m              printf ">>> "[m
+[32m+[m[32m              read -r ans[m
+[32m+[m[32m          done[m
+[32m+[m[32m          if [ "$ans" = "yes" ] || [ "$ans" = "Yes" ] || [ "$ans" = "YES" ][m
+[32m+[m[32m          then[m
+[32m+[m[32m              printf "Proceeding with installation of Microsoft VSCode\\n"[m
+[32m+[m[32m              $PYTHON -E -s "$PREFIX/pkgs/vscode_inst.py" --handle-all-steps || exit 1[m
+[32m+[m[32m          fi[m
+[32m+[m[32m      fi[m
+[32m+[m[32m    fi[m
+[32m+[m[32mfi[m
+[32m+[m[32mexit 0[m
+[32m+[m[32m@@END_HEADER@@[m
+[32m+[m[32mELF          >    V       @       Œô         @ 8  @         @       @       @       h      h                   ¨      ¨      ¨                                                                                                            F?      F?                    `       `       `      (      (                    ‹       ›       ›      è      H                  €‹      €›      €›      ğ      ğ                   Ä      Ä      Ä                             Påtd   ,q      ,q      ,q      ,      ,             Qåtd                                                  Råtd    ‹       ›       ›      à      à             /lib64/ld-linux-x86-64.so.2          GNU                   •   P   >   8                   9   =                  F               *   K                 .                           "       3   M                     )      #       4   &   1       (   :      ,       '   G       ?       E                       H                             N           B              5       /   O       <   2                                                 L               $   I                   -         C                 %                                            J                       !             @       +      D               A                                                                                                                                                                                [m
+[32m+[m[32m                                                                      	               7                            ;           6               0                  O                O       ÑeÎm                            ·                                          &                     ğ                     ò                     „                     H                     !                     ó                                             ¼                     Å                      ˆ                      O                     ä                     o                     U                     )                     §                     [                     Ë                                          ë                                          z                     7                     Ä                     }                     ˆ                                          Ã                     J                     R                                          û                      Ò                     ë                      s                     Ë                                                               n                     (                       œ                     }                      b                     §                      a                     š                      ¯                     Ó                      W                      â                     ¾                                           –                     Ò                     ö                     “                     ¶                      Û                      Ì                      p                      u                     å                                           g                     ¥                     C                     é                     h                     ®                     5                     7                       Q                      2                     ^                                              "                    libdl.so.2 _ITM_deregisterTMCloneTable __gmon_start__ _ITM_registerTMCloneTable dlsym dlopen dlerror libz.so.1 inflateInit_ inflateEnd inflate libc.so.6 __stpcpy_chk __xpg_basename mkdtemp fflush strcpy fchmod readdir setlocale fopen wcsncpy strncmp __strdup perror closedir ftell signal strncpy mbstowcs fork __stack_chk_fail unlink mkdir stdin getpid kill strtok feof calloc strlen memset dirname rmdir fseek clearerr unsetenv __fprintf_chk stdout strnlen fclose __vsnprintf_chk malloc strcat raise __strncpy_chk nl_langinfo opendir getenv stderr __snprintf_chk __strncat_chk execvp strncat __realpath_chk fileno fwrite fread waitpid strchr __vfprintf_chk __strcpy_chk __cxa_finalize __xstat __strcat_chk setbuf strcmp __libc_start_main ferror stpcpy free GLIBC_2.2.5 GLIBC_2.4 GLIBC_2.3.4 $ORIGIN/../../../../.. XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX                                                                                                          ui	   ÷                  ii        ui	   ÷     ti	         @›             £p      H›             Ÿp      P›             ¨p      `›             Up      h›             ±p      p›             ¶p                                                 ˜                                         ¨                    °                    ¸                    À                    È                    Ğ         	           Ø         [m
+[32m+[m[32m           à                    è                    ğ                    ø                                                                                                                          (                    0                    8                    @                    H                    P                    X                    `                    h                    p                    x                    €                    ˆ                              !           ˜         "                     #           ¨         %           °         &           ¸         '           À         (           È         )           Ğ         *           Ø         +           à         ,           è         -           ğ         .           ø         /            Ÿ         0           Ÿ         1           Ÿ         2           Ÿ         3            Ÿ         4           (Ÿ         5           0Ÿ         6           8Ÿ         7           @Ÿ         8           HŸ         9           PŸ         :           XŸ         ;           `Ÿ         <           hŸ         =           pŸ         >           xŸ         ?           €Ÿ         @           ˆŸ         A           Ÿ         B           ˜Ÿ         C            Ÿ         D           ¨Ÿ         E           °Ÿ         F           ¸Ÿ         G           ÀŸ         H           ÈŸ         I           ĞŸ         J           ØŸ         K           àŸ         O           èŸ         L           ğŸ         M           øŸ         N           ˆ         $                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           Hƒìèw   è_  èÿ>  HƒÄÃ        ÿ5R}  ÿ%T}  @ ÿ%R}  h    éàÿÿÿÿ%š  f        éË  1íI‰Ñ^H‰âHƒäğPTL¤>  H->  H=Öÿÿÿè±ÿÿÿôHƒìH‹M~  H…ÀtÿĞHƒÄÃH=j  UHb  H9øH‰åtH‹#}  H…Àt]ÿà]ÃH=B  H5;  ¹   H)şUHÁşH‰ğH‰åH™H÷ùH…ÀtH‰ÆH‹Ü~  H…Àt]ÿà]Ã€=   ueHƒ=Ñ~   UH‰åATStH‹=á~  èÿÿÿHz  Hz  H)ÃI‰ÄHÁûHÿËH‹â~  H9ØsHÿÀH‰Ó~  AÿÄëäè7ÿÿÿ[Æ¸~  A\]ÃÃUH‰å]éHÿÿÿf„     AT1ÒI‰üUS‰óîX  HcöHì`  H‹?dH‹%(   H‰„$X  1Àÿ‰}  …À…á   H‰åI‹$º   ¾X  H‰ïÿ/|  H…À„¾   H•   L>  ëfD  HƒêH9ê‚›   ¹   L‰ÆH‰×ó¦—À’Á)È¾À…Àu×óoH‹rPAD$ óoBA‹L$(ÉAD$0óoB )ËI‰t$pAD$@óoB0AD$PóoB@H)ê” ğÿÿA‰T$AD$`H‹œ$X  dH3%(   uHÄ`  []A\Ãf„     ¸ÿÿÿÿëÑÿ«{   ‹Ê‰ÒHH9GwÃ€    SH‰û1ÀH=>  gè¥  H‹C[Ãf.„     D  AWAVAUATI‰ôUH‰ıSHìˆ   H‹?dH‹%(   H‰D$x1ÀH…ÿ„=  A‹t$1ÒÎuÿ|  A‹t$Î‰óH‰ßÿá{  I‰ÅH…À„m  H‹M º   H‰ŞH‰Çÿ z  H…À„/  A€|$tGH‹} H…ÿtÿ¨z  HÇE     H‹L$xdH3%(   L‰è…£  HÄˆ   []A\A]A^A_Ã€    A‹\$E‹|$Ë‰ßÿT{  I‰ÆH…À„P  fïÀ‰\$ H‰ãD‰ø)D$@ºp   H5A<  H‰ßÈHÇD$P    L‰,$‰D$L‰t$ÿX{  …Àˆ¬   ¾   H‰ßÿºy  …ÀˆÑ   H‰ßÿ¡z  L‰ïM‰õÿ]y  é!ÿÿÿ„     H}xH5;  ÿ{  H‰ÇH‰E H…À…¢şÿÿH=„;  1ÀE1ígèí  éøşÿÿ„     H=;  1ÀgèÑ  L‰ïE1íÿõx  éĞşÿÿH=9<  1Àgè±  é¼şÿÿ‰ÆH=k<  H‹T$01Àgè–  L‰ïÿ½x  It$H=c;  1ÀE1ígèv  éşÿÿ‰ÆH‹T$0H=*;  1Àgè[  L‰ïÿ‚x  ëÃH=é;  1ÀgèA  L‰ïÿhx  ë©ÿy  AVI‰öAUATUSH‰ûgèŒıÿÿH‰ßH‰Ågè 0  ƒøÿtmMfH»x   L‰ægè×2  A‹vI‰ÅÎ‰óH…ÀtwH‰Áº   H‰ŞH‰ïÿz  HƒøtH…Ûu8L‰ïÿ?y  ¾À  ‰Çÿ¢y  L‰ïÿYx  H‰ïÿĞw  1À[]A\A]A^ÃD  1ÀL‰âH5l;  H=™:  gèg  ¸ÿÿÿÿëÒ1ÀL‰âH5^:  H=s:  gèG  ¸ÿÿÿÿë²AUATI‰ÔUH‰õ¾   SH‰ûH‰ïHƒìÿ/x  ¾   L‰çI‰Åÿx  IDH=   wqH{xº   H‰îÿ‡x  º   L‰æH‰ÇÿÆx  H‹x  º   H‰îH‰Ïÿ®x  H»x0  º   Çƒx@      H‰Æÿx  1ÀHƒÄ[]A\A]Ãf.„     ¸ÿÿÿÿëäf„     ‹G4ÈÃf.„     USH‰ûHƒìH‹?H…ÿ„Ë   1öº   ÿx  H‹;ÿw  H‰ß‰ÆèKúÿÿƒøÿ„Â   Çƒ|@      H‰ßgèŸÿÿÿHØx  ‹s,H‹;‰1ÒÎsÿÓw  ‹s0Î‰õH‰ïÿ«w  H‰CH…À„«   H‹º   H‰îH‰Çÿjv  H…Àtd‹C0H‹;È‰ÀHCH‰CÿEv  ‰Å…ÀucH‹;H…ÿtÿav  HÇ    HƒÄ‰è[]ÃH{xH58  ÿ—w  H‰ÇH‰H…À…ÿÿÿ½ÿÿÿÿëÏH5œ8  H=¯8  1À½ÿÿÿÿgèN  ë²H=Ÿ8  1ÀgèM  ëËH5T9  H=`8  ½ÿÿÿÿgè"  ë†SH‰ûgèÖıÿÿ…Àu"H‰ßgè™şÿÿ…ÀtH‹;H…ÿtÿ·u  HÇ    ¸ÿÿÿÿ[Ãf„     H…ÿt+SH‰ûH‹H…ÿtÿu  H‹;H…ÿtÿzu  H‰ß[ÿ%ğt  Ãf.„     D  AVAUI‰õATUH‰ıSH‹_H‰÷ÿeu  H9]v9Lcà@ €{ouLsL‰âL‰îL‰÷ÿ¿t  …Àt#H‰ŞH‰ïgèùÿÿH‰ÃH9EwÎ1À[]A\A]A^Ã B€|# K&tè[KD&]A\A]A^Ãf.„     @ H‹‘v  H‰úH‰ñ¾   H‹8ÿ%=t  D  SH‰ûHìĞ   H‰t$(H‰T$0H‰L$8L‰D$@L‰L$H„Àt7)D$P)L$`)T$p)œ$€   )¤$   )¬$    )´$°   )¼$À   dH‹%(   H‰D$1Àÿ3t  H·7  ¾   ‰ÁH‹îu  H‹81Àÿ«u  H„$à   H‰æH‰ßH‰D$HD$ H‰D$Ç$   ÇD$0   gèÿÿÿH‹D$dH3%(   u	HÄĞ   [Ãÿòs  f.„     SH‰ûH‰÷HìĞ   H‰T$0H‰L$8L‰D$@L‰L$H„Àt7)D$P)L$`)T$p)œ$€   )¤$   )¬$    )´$°   )¼$À   dH‹%(   H‰D$1ÀH„$à   H‰æÇ$   H‰D$HD$ H‰D$ÇD$0   gèTşÿÿH‰ßÿ{t  H‹D$dH3%(   u	HÄĞ   [Ãÿ$s  f.„     fSH‰ûHìp  H‰”$Ğ   H‰Œ$Ø   L‰„$à   L‰Œ$è   „Àt@)„$ğ   )Œ$   )”$  )œ$   )¤$0  )¬$@  )´$P  )¼$`  dH‹%(   H‰„$¸   1ÀH„$€  I‰ğH‰ßH‰D$LL$º   H„$À   HÇÁÿÿÿÿ¾   ÇD$   ÇD$0   H‰D$ÿ:s  HT$ H‰Ş¿   ÿïr  H‹Œ$¸   dH3%(   u	HÄp  [Ãÿr  f.„      AWº  I‰ÿAVAUATUSHì(P  L‹'dH‹%(   H‰„$P  1ÀH¬$@  H‰ïÿ8q  €¼$P   …½  H55  H‰ïLl$ÿår  Hœ$  º   L‰ïH‰ÆÿŒr  1ÿH5ä4  ÿ½r  º   H‰ßH‰Æÿlr  €|$ „d  €¼$   „V  L‰îH‰ïL´$   gèç[m
+[32m+[m[32m  HƒìI‰èL‰÷I„$x  L‰4  H‰D$H‰Â1ÀL‰ÉSH54  èôıÿÿZY…Àu^L‰çgè(  ƒøÿ„¬  I´$x   H‰ÚL‰÷gèØ,  ƒøÿ„  1ÀH‹Œ$P  dH3%(   …õ  HÄ(P  []A\A]A^A_Ã@ HƒìL 4  1ÀL‰÷SM‰ÑL‰ÑL4  ARH5û3  UH‹T$ L‰T$(èYıÿÿHƒÄ L‹T$…À„ZÿÿÿL‹4$1ÀM‰èL‰ÑL¤$0  H5Î3  L‰T$L‰òL‰çèıÿÿ…À…¥   I‹?gè<'  ƒøÿ„ã   I‹oH…í„  MoëM‰îIƒÅI‹møH…í„  H}xL‰æÿGp  …ÀuÛL‹eL;eƒşşÿÿD  I|$H‰Şÿ"p  …ÀuL‰æH‰ïgèªöÿÿ…À…’   L‰æH‰ïgèöóÿÿI‰ÄH;ErÅé¹şÿÿ„     L‹T$1ÀM‰èL‰òH53  L‰çL‰ÑèQüÿÿL‹T$…À„/ÿÿÿH‹$1ÀM‰èL‰ÑH5Ë2  L‰çè)üÿÿ…À„ÿÿÿ1ÀL‰æH=Ë2  gèNúÿÿ¸ÿÿÿÿéGşÿÿ@ H=á2  H‰Ş1Àgè.úÿÿH‰ïÿUn  ¸ÿÿÿÿéşÿÿMw€    ¿@  ÿ­o  H‰ÅH…À„Æ   Hxxº   L‰æÿ/n  M‹/º   H½x  Iµx  ÿn  Iµx   º   H½x   ÿúm  €½w   uY€½w    uP€½w0   uGA‹…x@  H‰ï‰…x@  gè÷ÿÿ…ÀueI‰.éjşÿÿD  1ÀH‰ŞH=¡1  gè^ùÿÿ¸ÿÿÿÿéWıÿÿ@ H=y2  1ÀgèAùÿÿH‰ïÿhm  éÓşÿÿH542  H=H0  1Àgèúÿÿé¸şÿÿL‰âH5œ1  H=*0  1ÀgèïùÿÿH‰ïÿ&m  é‘şÿÿÿÃm  f.„     AU¹   ATUH‰ıSHì¸   H‹_dH‹%(   H‰„$¨   1ÀI‰äIT$H‰×óH«H‰,$H;]r)éÇ   €    <xt(<dtHH‰ŞH‰ïgè¬ñÿÿH‰ÃH9EvS¶CP¦â÷   uÔH‰ŞH‰ïgè(ôÿÿ…ÀtÌH‹|$A½ÿÿÿÿë/€    HsL‰çèûÿÿA‰Åƒøÿu¤H‹|$ëD  H‹|$E1íH…ÿtIƒÄ€    gè÷ÿÿIƒÄI‹|$øH…ÿuìH‹Œ$¨   dH3%(   D‰èuHÄ¸   []A\A]ÃE1íë×ÿl  D  AWAVAUATUH‰ıSHì(  H‹_H=^0  dH‹%(   H‰„$  1ÀH÷n  ÿH‰D$H…À„å  H°n  H‹|$ÿI‰ÆH…À„²  HD$H‰$H;]r'é  f„     H‰ŞH‰ïgèdğÿÿH‰ÃH9E†ï   €{suáH‰ŞH‰ïLcgèğÿÿ¾   L‰çI‰Åÿ l  H=û  ‡ì   L‹<$º   L‰æL‰ÿÿgl  Ç .py H²o ‹ …Àt|Håm  L‰ÿÿI‰ÇHæm  H5Œ/  L‰úH‹|$ÿHnn  L‰ÿÿHJm  ‹sL‰ïÎ‰öÿH…À„   H‰ÇH3m  L‰òL‰öÿH…À„’   L‰ïÿ‰j  éÿÿÿ@ H9m  H‹<$ÿI‰ÇëfD  1ÀH‹Œ$  dH3%(   …¤   HÄ(  []A\A]A^A_ÃD  1ÀH=Å.  gèùõÿÿ¸ÿÿÿÿë¼fL‰æH=~/  gèàõÿÿHQm  ÿ¸ÿÿÿÿëšHAm  ÿ1ÀL‰æH=¡.  gèµõÿÿ¸ÿÿÿÿéuÿÿÿ1ÀH=/  gèœõÿÿ¸ÿÿÿÿé\ÿÿÿH=Û.  gè…õÿÿ¸ÿÿÿÿéEÿÿÿÿMj  D  Ãf.„     D  AUATUSH‰ûHƒìgè½  …À…µ   Çƒ|@     H‰ßgè’  …À…š   H‰ßgè‘  …À…‰   H‰ßgè`  …Àu|H-m  H‹E Hƒ8 tHƒÄH‰ß[]A\A]é)ıÿÿ„     1ö1ÿÿ¾j  H‰Çÿíi  H5Û+  1ÿI‰Äÿ£j  ¿   ÿhj  L‰æ1ÿI‰ÅÿŠj  L‰çÿÉh  H‹E L‰(ë•HƒÄ¸ÿÿÿÿ[]A\A]Ãé+  f.„     Ãf.„     D  AWAVA‰ş¿   AUI‰õ¾@  ATUSHì(0  dH‹%(   H‰„$0  1ÀÿVi  H…À„w  Hl$I‹u L¼$  H‰ÃH‰ïgè0  H„$   H‰îH‰ÇH‰D$gèç  H‰îL‰ÿgèË  H=î-  gè®  H=á-  I‰ÄgèN  L‰ú‹2HƒÂ†ÿşşş÷Ö!ğ%€€€€té‰ÆH‰ßÁî©€€  DÆHrHDÖL‰ş‰Á ÁHƒÚL)úHêgèEòÿÿ…À…½   D‰³€@  L‰«ˆ@  M…ä„  L‰æL‰ÿÿ‚h  …ÀtDH‹x   º   L‰æH‰Ïÿvg  €»w0   …q  H»x0  º   H‰ÆÇƒx@     ÿÚh  H‰ßgè‰ıÿÿH‰ßgèıÿÿH‰ß‰ÅgèeşÿÿH‹Œ$0  dH3%(   ‰è…F  HÄ(0  []A\A]A^A_Ãf.„     L‰ú‹2HƒÂ†ÿşşş÷Ö!ğ%€€€€té‰ÆH‰ßÁî©€€  DÆHrHDÖL‰ş‰Á ÁHƒÚL)úHT$gè5ñÿÿ…À„ğşÿÿH‰îH‹T$H=>,  1ÀgèFòÿÿ½ÿÿÿÿéWÿÿÿ@ H‰ßgèOùÿÿ…Àu{€»x    L‰ştH³x   H=+,  gè  H‰ßgèR$  ƒøÿtM1Àgè…ıÿÿH‰ïL‰éD‰òH‰Şgèó$  ƒ»x@  ‰ÅtH‰ßgèßğÿÿéåşÿÿf.„     H»x   gèÃ  ëÙ½ÿÿÿÿéÁşÿÿH5_+  H=«+  1À½ÿÿÿÿgè{òÿÿé¡şÿÿÿXf  Sº   H‰ûHì  dH‹%(   H‰„$  1ÀH‰áH‰Ïÿ)g  H‰Çÿ8f  H‰ßH‰Æÿ¤e  H‹„$  dH3%(   u	HÄ  [Ãÿòe  f.„     SH‰ûH‰÷ÿ{f  H‰ß[H‰Æÿ%^e  fD  ATI‰ôUH‰ÕSH…ÿtiH‰ûº   1öÿÉe  L‰çÿ˜e  L‰æH‰ßH‰Âÿe  H‰ßÿ€e  €|ÿ/t	Æ/ÆD H‰ïÿge  €|ÿ/tPH‰îH‰ßÿ´f  H‰Ø[]A\Ã@ H‰÷ÿ?e  H‰ïH‰Ãÿ3e  ¾   H|ÿƒe  H‰ÃH…À…vÿÿÿëÁD  H‰îH‰ßHPşÿ8e  H‰Ø[]A\Ã„     AUI‰ıATUH‰õSHì0  dH‹%(   H‰„$0  1ÀL¤$    H‰ãL‰çgèÖşÿÿH‰îH¬$   H‰ßgèRşÿÿº   H‰îH‰ßÿÑd  1ÒH…ÀtL‰âH‰îL‰ïgè»şÿÿ1ÒH…À”ÂH‹Œ$0  dH3%(   ‰ĞuHÄ0  []A\A]ÃÿRd  f.„     Hì¨   H‰ş¿   dH‹%(   H‰„$˜   1ÀH‰âÿÕd  …À”ÀH‹Œ$˜   dH3%(   u¶ÀHÄ¨   Ãÿôc  f.„     fAWAVAUI‰õATUSHì8   dH‹%(   H‰„$(   1ÀH‰|$H=˜5  gè·  H…À„æ   I‰ÇLd$H¬$   ëS@ H‰Ã¸   ¹  L‰şL)ûL‰çHû   HGØH‰Úÿ^d  H‰ïÆD L‰êL‰ægèŠıÿÿH‰ïgèÿÿÿ…ÀuGM~¾:   L‰ÿÿCc  I‰ÆH…Àu›º   L‰şL‰çÿŠb  H‰ïL‰êL‰ægèCıÿÿH‰ïgèºşÿÿ…Àt>º   H‰îH‹|$ÿ[b  1ÀH‹Œ$(   dH3%(   uHÄ8   []A\A]A^A_Ã@ ¸ÿÿÿÿëĞÿ³b  f.„     AUATI‰üUH‰õSHì  dH‹%(   H‰„$  1À€>/t¾/   H‰ïÿb  H…Àt:H‰îL‰çgèfıÿÿ…À”À¶À÷ØH‹Œ$  dH3%(   uPHÄ  []A\A]Ã I‰åH‰îL‰ïgè9şÿÿ‰Ãƒøÿt[m
+[32m+[m[32mL‰îë®D  º   H‰îL‰ïÿoa  €¼$ÿ   tÛ‰Øëÿëa   é‹ûÿÿf.„     Hƒìÿ¶a  Ç .pkgÆ@ HƒÄÃ€    U‰õH5ú&  SH‰ûHƒìÿ c  HÙd  H‰H…À„Õ  H5ë&  H‰ßÿıb  H®d  H‰H…À„É  H5å&  H‰ßÿÚb  Hƒd  H‰H…À„Ô  H5Ğ&  H‰ßÿ·b  HXd  H‰H…À„š  H5Æ&  H‰ßÿ”b  H-d  H‰H…À„¥  H5±&  H‰ßÿqb  Hd  H‰H…À„™  H5¥&  H‰ßÿNb  H×c  H‰H…À„  H5’&  H‰ßÿ+b  H¬c  H‰H…À„  H5~&  H‰ßÿb  Hc  H‰H…À„u  H5i&  H‰ßÿåa  HVc  H‰H…À„i  H5l&  H‰ßÿÂa  H+c  H‰H…À„]  H5s&  H‰ßÿŸa  H c  H‰H…À„Q  H5v&  H‰ßÿ|a  HÕb  H‰H…À„(  ƒıH  H5¨&  H‰ßÿPa  H‘b  H‰H…À„  H5—&  H‰ßÿ-a  Hfb  H‰H…À„  H5…&  H‰ßÿ[m
+[32m+[m[32ma  H;b  H‰H…À„  H5w&  H‰ßÿç`  Hb  H‰H…À„  H5~&  H‰ßÿÄ`  Håa  H‰H…À„Ò  H5j&  H‰ßÿ¡`  Hºa  H‰H…À„ô  H5q&  H‰ßÿ~`  Ha  H‰H…À„º  H5a&  H‰ßÿ[`  Hda  H‰H…À„Å  H5V&  H‰ßÿ8`  H9a  H‰H…À„¹  H5I&  H‰ßÿ`  Ha  H‰H…À„­  H54&  H‰ßÿò_  Hã`  H‰H…À„¡  H59&  H‰ßÿÏ_  H¸`  H‰H…À„¬  H5$&  H‰ßÿ¬_  H`  H‰H…À„r  H5&  H‰ßÿ‰_  Hb`  H‰H…À„”  H5&  H‰ßÿf_  H7`  H‰H…À„Z  H5ù%  H‰ßÿC_  H`  H‰H…À„  ƒıo  H5&  H‰ßÿ_  HĞ_  H‰H…À„P  H5ù%  H‰ßÿô^  H¥_  H‰H…À„  H5æ%  H‰ßÿÑ^  Hz_  H‰H…À„8  H5Ó%  H‰ßÿ®^  HO_  H‰H…À„ş  H5À%  H‰ßÿ‹^  H$_  H‰H…À„	  H5«%  H‰ßÿh^  HÉ^  H‰H…À„ı  H5Ş*  H‰ßÿE^  H^  H‰H…À„M  ƒıÑ   1ÀHƒÄ[]Ã„     H5#  H‰ßÿ^  HY_  H‰H…À„Ë  H5#  H‰ßÿå]  H._  H‰H…À…rüÿÿH=ı"  gèmçÿÿ¸ÿÿÿÿë—fD  H5q$  H‰ßÿ¨]  Hi^  H‰H…À„™  H5b$  H‰ßÿ…]  H^  H‰H…À…KşÿÿH=ë(  gèçÿÿ¸ÿÿÿÿé4ÿÿÿ H5›$  H‰ßÿH]  HÙ]  H‰H…À„—  ƒı"´   H5”$  H‰ßÿ]  H¥]  H‰H…À„‚  H5«$  H‰ßÿù\  Hr]  H‰H…À„  H5]$  H‰ßÿÖ\  H?]  H‰H…À„  ƒı‘şÿÿH5B$  H‰ßÿª\  H]  H‰H…À…nşÿÿH=@*  gè2æÿÿ¸ÿÿÿÿéYşÿÿ„     H5Ğ#  H‰ßÿh\  Hñ\  H‰H…À…LÿÿÿH=^)  gèğåÿÿƒÈÿéşÿÿ„     H=ñ#  gèÓåÿÿ¸ÿÿÿÿéúıÿÿH=[m
+[32m+[m[32m$  gè¼åÿÿ¸ÿÿÿÿéãıÿÿH=C$  gè¥åÿÿ¸ÿÿÿÿéÌıÿÿH=$  gèåÿÿ¸ÿÿÿÿéµıÿÿH=E$  gèwåÿÿ¸ÿÿÿÿéıÿÿH=N$  gè`åÿÿ¸ÿÿÿÿé‡ıÿÿH=g$  gèIåÿÿ¸ÿÿÿÿépıÿÿH=x$  gè2åÿÿ¸ÿÿÿÿéYıÿÿH=‰$  gèåÿÿ¸ÿÿÿÿéBıÿÿH=ç  gèåÿÿ¸ÿÿÿÿé+ıÿÿH=ø  gèíäÿÿ¸ÿÿÿÿéıÿÿH=	   gèÖäÿÿ¸ÿÿÿÿéıüÿÿH=m$  gè¿äÿÿ¸ÿÿÿÿéæüÿÿH=~$  gè¨äÿÿ¸ÿÿÿÿéÏüÿÿH=$  gè‘äÿÿ¸ÿÿÿÿé¸üÿÿH= $  gèzäÿÿ¸ÿÿÿÿé¡üÿÿH=T   gècäÿÿ¸ÿÿÿÿéŠüÿÿH=š$  gèLäÿÿ¸ÿÿÿÿésüÿÿH=_   gè5äÿÿ¸ÿÿÿÿé\üÿÿH=”$  gèäÿÿ¸ÿÿÿÿéEüÿÿH=­$  gèäÿÿ¸ÿÿÿÿé.üÿÿH=¾$  gèğãÿÿ¸ÿÿÿÿéüÿÿH={   gèÙãÿÿ¸ÿÿÿÿé üÿÿH=Ğ$  gèÂãÿÿ¸ÿÿÿÿééûÿÿH=™$  gè«ãÿÿ¸ÿÿÿÿéÒûÿÿH=ò$  gè”ãÿÿ¸ÿÿÿÿé»ûÿÿH=³$  gè}ãÿÿ¸ÿÿÿÿé¤ûÿÿH=”%  gèfãÿÿ¸ÿÿÿÿéûÿÿH=U%  gèOãÿÿ¸ÿÿÿÿévûÿÿH=¶%  gè8ãÿÿ¸ÿÿÿÿé_ûÿÿH=w%  gè!ãÿÿ¸ÿÿÿÿéHûÿÿH=°%  gè[m
+[32m+[m[32mãÿÿ¸ÿÿÿÿé1ûÿÿH=¹%  gèóâÿÿ¸ÿÿÿÿéûÿÿH=j"  gèÜâÿÿ¸ÿÿÿÿéûÿÿH=-  gèÅâÿÿ¸ÿÿÿÿéìúÿÿH=<$  gè®âÿÿ¸ÿÿÿÿéÕúÿÿH=M$  gè—âÿÿ¸ÿÿÿÿé¾úÿÿH=%  gè€âÿÿ¸ÿÿÿÿé§úÿÿ1ÀH=%&  gègâÿÿ¸ÿÿÿÿéúÿÿH=6&  gèPâÿÿ¸ÿÿÿÿéwúÿÿH=%  gè9âÿÿ¸ÿÿÿÿé`úÿÿH=¸%  gè"âÿÿƒÈÿéKúÿÿf.„     H¡Y  ÿ €    H™Y  ÿ €    HáX  ÿ €    HéX  ÿ €    HáX  ÿ €    AWAVAUATUSHì(@  H‹_L-„Y  dH‹%(   H‰„$@  1ÀH‚Y  H‹ Ç    H‚Y  H‹ Ç    H‚Y  H‹ Ç    HJY  H‹ Ç    HJY  H‹ Ç    I‹E Ç     H;_ƒÜ   H‰ıE1öL|$L%O%  ë>f„     <u„è   <vuI‹E Ç    f.„     H‰ŞH‰ïgèÚÿÿH‰ÃH9Ev;€{ouåHs¹   L‰çó¦tÕ¶C<W„©   §<OuÃH”X  H‹ Ç    ë±E…ötJH‹-ôT  H‹} ÿ:V  H‹ûV  H‹;ÿ*V  H‹U  1öH‹8ÿHU  1öH‹} ÿ<U  1öH‹;ÿ1U  1ÀH‹”$@  dH3%(   …¡   HÄ(@  []A\A]A^A_ÃfD  A¾   é%ÿÿÿD  HéX HK‹ …Àu7H‰ÎH‰L$º   L‰ÿÿT  H‹L$Hƒøÿt$HïV  L‰ÿÿéİşÿÿD  H‰ÏgèïıÿÿéÊşÿÿH‰D$H‰Î1ÀH=Q$  gè£ßÿÿH‹T$‰ĞéHÿÿÿÿiT  U1ÒHw8SH‰ûHìX  H-'V  dH‹%(   H‰„$H  1ÀH‰á‹E H‰Ïƒèƒø	H.X –Â‰º@   ÿ†S  €|$? uWH³x0  H\$@H‰ÂH‰ßgè/îÿÿH‰ßgèV  H…ÀtG‹u H‰Çgè%òÿÿH‹Œ$H  dH3%(   uJHÄX  []Ã„     1ÀH=Ç#  gèÑŞÿÿ¸ÿÿÿÿëÅÿ4U  H‰ŞH=Ê#  H‰Â1Àgè¯Şÿÿ¸ÿÿÿÿë£ÿzS  fUH‰ıSHƒìH‹?H…ÿtH‰ë@ ÿ²R  HƒÃH‹;H…ÿuîHƒÄH‰ï[]ÿ%—R  €    AWAVAUATI‰ô1öU‰ı1ÿSHƒìÿ+T  H‰ÇÿZS  H…À„é   DuI‰Ç¾   McöJõ    H‰D$H‰Çÿ<S  H‰ÃH…À„¸   1ÿH5  ÿÙS  …í~}ƒíA¾   L-ÅT  HƒÅë€    IƒÆI9îtWK‹|ôø1öAÿU J‰DóøH…ÀuâH‰ß1ÛgèÿÿÿL‰ÿÿÎQ  D‰öH=Ô"  1ÀgèŒİÿÿHƒÄH‰Ø[]A\A]A^A_Ãf.„     H‹D$1ÿL‰şHÇDø    ÿ?S  L‰ÿÿ~Q  ëÀ@ H=z!  1À1Ûgè7İÿÿë©D  ATI‰ü1ÿUSH‰ó1öHƒìH‰T$ÿûR  H‰Çÿ*R  H-ÛU 1ÿH5  H‰E ÿØR  HÑS  H‰ßHt$ÿ1ÿH‹u H‰Ãÿ¸R  H…ÛtH‰ŞH‹T$L‰çÿâQ  H‰ßL‰ãÿŞP  HƒÄH‰
