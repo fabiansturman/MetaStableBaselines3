@@ -23,8 +23,8 @@ torch.set_default_device(device)
 #######################################################
 model_save_path = "saved_models/19May_TestingMAML_A2C" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
 
-import os
-os.mkdir(model_save_path)
+#import os
+#os.mkdir(model_save_path)
 #######################################################
 print("set seeds")
 seed = 0
