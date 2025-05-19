@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 device = 'cpu'# 'cuda' #  #doing cpu as A2C with MlpPolicy (rather than CNNpolicy) in stablebaseline is faster on CPU, and the meta gradinet beign faster on GPU (even if it is) is not *that* much faster - it is about two(ish) times slower overall based on one run each with two meta iterations, so better on cpu in this case
 torch.set_default_device(device)
 #################################################################
-model_save_path = "saved_models/14May25_3repeat_metalearningKD_robust"
+model_save_path = "saved_models/14May25_3b_metalearningKD_robust"
 
 import os
 os.mkdir(model_save_path)
@@ -37,7 +37,7 @@ print("Setting up for meta learning")
 adapt_lr =  7e-4
 meta_lr = 0.0005 
 
-meta_iterations = 1250#500#1250
+meta_iterations = 200#500#1250
 tasks_per_loop = 60
 adapt_timesteps = 32*4 #for this enviornment, each episode is exactly 32 timesteps, so multiple of 32 means full number of eps experienced for each task
 M = 5 #number of sampled adapted policies for each task (to see quality of meta parameters for this task in terms of mean performance, for more reliable targetting of dangerous tasks)
@@ -65,6 +65,11 @@ meta_rets = []
 best_meta_ret = None
 best_meta_ret_it = -1
 
+#################################################################
+print("Loading up a previously trained model to continue training")
+
+model_load_path = "saved_models/14May25_3a_metalearningKD_robust/final"
+meta_agent.policy.load_state_dict(torch.load(model_load_path, weights_only=True)) 
 
 #################################################################
 print("Defining some helper functions")
