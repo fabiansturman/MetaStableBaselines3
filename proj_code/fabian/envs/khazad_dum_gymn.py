@@ -26,7 +26,8 @@ class KhazadDum(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, task = None, 
-                 action_noise=0.1, max_episode_steps=32, continuous=False,
+                 action_noise=0.1, noise_offset = 0, 
+                 max_episode_steps=32, continuous=False,
                  obs_level=1, one_hot=True, seed=None, init_state=None, safe_banks=True,
                  exp_bonus=0, per_action_bonus=True, bridge_bonus_factor=1, eval_mode=None,
                  normalize_rewards=None, continuous_rewards=True, size=(11,9),
@@ -49,7 +50,10 @@ class KhazadDum(gym.Env):
 
         self.task_dim = 1
         self.average_noise = action_noise #this defines the distribution of the task
+        self.noise_offset = noise_offset
         self.task = action_noise
+
+
         self.safe_banks = safe_banks
         self._max_episode_steps = max_episode_steps
         self.continuous_rewards = continuous_rewards
@@ -548,11 +552,14 @@ class KhazadDum(gym.Env):
         return self.task
 
     def sample_task(self, avg=None):
+        """
+        Noise is exponentially distributed with mean {avg}, and then offset by {self.noise_offset} (defaults at 0 in construction)
+        """
         if avg is None:
             avg = self.average_noise
         if avg == 0:
-            return 0
-        return random.expovariate(1/avg)
+            return 0 + self.noise_offset
+        return random.expovariate(1/avg) + self.noise_offset
 
     def sample_tasks(self, n_tasks):
         return [self.sample_task() for _ in range(n_tasks)]
