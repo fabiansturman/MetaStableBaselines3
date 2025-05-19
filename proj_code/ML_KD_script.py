@@ -156,7 +156,7 @@ for t in tqdm(range(dim*dim)):
     loaded_meta_agent.learn(total_timesteps=adapt_timesteps) #adapt the meta agent to this task
 
     #Test against a new trajectory from that state (else we are showing something it trained to and before the final training step)
-    loaded_meta_agent.run_meta_adaption_and_loss(total_timesteps=32)
+    loaded_meta_agent.meta_evaluate(total_timesteps=32)
 
     #Plot this run
     x = t//dim
