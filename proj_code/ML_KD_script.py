@@ -73,6 +73,7 @@ best_meta_ret_it = -1
 #######################################################
 #Outer meta-learning loop
 for meta_it in tqdm(range(meta_iterations)):
+    break
     meta_loss = 0
     meta_ret = 0
     #Have agent adapt to tasks one by one
@@ -117,7 +118,7 @@ for meta_it in tqdm(range(meta_iterations)):
         #Save meta model
         torch.save(meta_agent.policy.state_dict(), f"{model_save_path}\\meta_it_{meta_it}")
 
-torch.save(meta_agent.policy.state_dict(), f"{model_save_path}/final")
+#torch.save(meta_agent.policy.state_dict(), f"{model_save_path}/final")
 
 #######################################################
 print("Plotting meta learning curves")
@@ -139,7 +140,8 @@ plt.savefig(f"{model_save_path}/trainingReturnCurve")
 plt.clf()
 #######################################################
 print("Loading in model")
-loaded_meta_agent = A2C("MlpPolicy", env, verbose=0, meta_learning=True, learning_rate=adapt_lr, device=device)
+loaded_meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device,
+                 meta_learning=True, M=M, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps)
 loaded_meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}/final", weights_only=True)) 
     #can also load in intermediate saved envs from training
 #######################################################
