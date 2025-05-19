@@ -153,10 +153,11 @@ fig, axs = plt.subplots(dim, dim, figsize=(10, 8))
 for t in tqdm(range(dim*dim)):
     #Perform few shot adaption to environment
     env.unwrapped.reset_task() #randomly selects task from environment to reset it to
-    loaded_meta_agent.learn(total_timesteps=adapt_timesteps) #adapt the meta agent to this task
+    _,_,adapted_policy = loaded_meta_agent.meta_adapt(task = env.unwrapped.get_task(), M=1)
+    adapted_policy = adapted_policy[0] # we set M=1 above so only 1 policy adapted here
 
     #Test against a new trajectory from that state (else we are showing something it trained to and before the final training step)
-    loaded_meta_agent.meta_evaluate(total_timesteps=32)
+    loaded_meta_agent.evaluate_policy(total_timesteps=32, policy=adapted_policy)
 
     #Plot this run
     x = t//dim

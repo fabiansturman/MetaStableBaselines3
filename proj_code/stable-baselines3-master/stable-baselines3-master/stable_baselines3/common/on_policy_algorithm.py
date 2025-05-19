@@ -370,9 +370,10 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         
         returns (mean loss,mean return) 
         """
+        #If policy not specified, try to test policy clone else the main policy itself
         if policy is None and self.policy_clone is not None:
-            policy = self.policy_clone #Unless otherwise specified, we will try to evaluate the cloned policy (if this cloned policy doesn't exist and no specific policy to evaluate has been specified, defaults to {self.policy})
-        else:
+            policy = self.policy_clone 
+        elif policy is None and  self.policy_clone is None :
             policy = self.policy
 
         
