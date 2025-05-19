@@ -69,6 +69,13 @@ class PPO(OnPolicyAlgorithm):
     :param device: Device (cpu, cuda, ...) on which the code should be run.
         Setting it to auto, the code will be run on the GPU if possible.
     :param _init_setup_model: Whether or not to build the network at the creation of the instance
+
+    
+    Meta-learning parameters:
+    :param meta_learning: Whether to wrap the policy in a MAML module in order to calculator meta-gradients over (adaptation) training of the policy
+    :param M: Number of models we adapt to the task
+    :param adapt_timesteps: Number of timesteps for each adaption (proportional to the 'number of shots' in our learning, with its conventional definition as K(-shot)= # trajectories used to learn)
+    :param eval_timesteps: Number of timesteps with which we evaluate how well a policy has adapted to a given task    
     """
 
     policy_aliases: ClassVar[dict[str, type[BasePolicy]]] = {
@@ -105,6 +112,10 @@ class PPO(OnPolicyAlgorithm):
         seed: Optional[int] = None,
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
+        meta_learning = False,
+        M = None,
+        adapt_timesteps = None,
+        eval_timesteps = None
     ):
         super().__init__(
             policy,
@@ -133,6 +144,10 @@ class PPO(OnPolicyAlgorithm):
                 spaces.MultiDiscrete,
                 spaces.MultiBinary,
             ),
+            meta_learning = meta_learning,
+            M=M,
+            adapt_timesteps=adapt_timesteps,
+            eval_timesteps=eval_timesteps
         )
 
         # Sanity check, otherwise it will lead to noisy gradient and NaN
@@ -182,8 +197,9 @@ class PPO(OnPolicyAlgorithm):
             self.clip_range_vf = get_schedule_fn(self.clip_range_vf)
 
     def train(self) -> None:
-        """
-        Update policy using the currently gathered rollout buffer.
+        """       
+            Consume current rollout data and perform single update of {self.policy} parameters.
+            Uses PPO algorithm to perform this training.
         """
         # Switch to train mode (this affects batch norm / dropout)
         self.policy.set_training_mode(True)
@@ -203,7 +219,7 @@ class PPO(OnPolicyAlgorithm):
         # train for n_epochs epochs
         for epoch in range(self.n_epochs):
             approx_kl_divs = []
-            # Do a complete pass on the rollout buffer
+            # Do a complete pass on the rollout buffer; we consume it in batches of size {batch_size} (not all in one go)
             for rollout_data in self.rollout_buffer.get(self.batch_size):
                 actions = rollout_data.actions
                 if isinstance(self.action_space, spaces.Discrete):
@@ -276,6 +292,125 @@ class PPO(OnPolicyAlgorithm):
                 # Clip grad norm
                 th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
                 self.policy.optimizer.step()
+            self._n_updates += 1
+            if not continue_training:
+                break
+
+        explained_var = explained_variance(self.rollout_buffer.values.flatten(), self.rollout_buffer.returns.flatten())
+
+        # Logs
+        self.logger.record("train/entropy_loss", np.mean(entropy_losses))
+        self.logger.record("train/policy_gradient_loss", np.mean(pg_losses))
+        self.logger.record("train/value_loss", np.mean(value_losses))
+        self.logger.record("train/approx_kl", np.mean(approx_kl_divs))
+        self.logger.record("train/clip_fraction", np.mean(clip_fractions))
+        self.logger.record("train/loss", loss.item())
+        self.logger.record("train/explained_variance", explained_var)
+        if hasattr(self.policy, "log_std"):
+            self.logger.record("train/std", th.exp(self.policy.log_std).mean().item())
+
+        self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
+        self.logger.record("train/clip_range", clip_range)
+        if self.clip_range_vf is not None:
+            self.logger.record("train/clip_range_vf", clip_range_vf)
+
+    
+    def train_clone(self) -> None:
+        """       
+            Consume current rollout data and perform single update of {self.policy_clone} parameters.
+            Uses PPO algorithm to perform this training, and MAML syntax (for ability to calculate gradients over the training).
+        """
+        assert self.policy_clone is not None
+
+        # Switch to train mode (this affects batch norm / dropout)
+        self.policy_clone.set_training_mode(True)
+        
+        #TODO: get a way to update the learning rate within metalearning adaptation too (i suppose by tweaking self.policy_clone.lr)
+
+
+        # Compute current clip range
+        clip_range = self.clip_range(self._current_progress_remaining)  # type: ignore[operator]
+        # Optional: clip range for the value function
+        if self.clip_range_vf is not None:
+            clip_range_vf = self.clip_range_vf(self._current_progress_remaining)  # type: ignore[operator]
+
+        entropy_losses = []
+        pg_losses, value_losses = [], []
+        clip_fractions = []
+
+        continue_training = True
+        # train for n_epochs epochs
+        for epoch in range(self.n_epochs):
+            approx_kl_divs = []
+            # Do a complete pass on the rollout buffer; we consume it in batches of size {batch_size} (not all in one go)
+            for rollout_data in self.rollout_buffer.get(self.batch_size):
+                actions = rollout_data.actions
+                if isinstance(self.action_space, spaces.Discrete):
+                    # Convert discrete action from float to long
+                    actions = rollout_data.actions.long().flatten()
+
+                values, log_prob, entropy = self.policy_clone.evaluate_actions(rollout_data.observations, actions)
+                values = values.flatten()
+                # Normalize advantage
+                advantages = rollout_data.advantages
+                # Normalization does not make sense if mini batchsize == 1, see GH issue #325
+                if self.normalize_advantage and len(advantages) > 1:
+                    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+                # ratio between old and new policy, should be one at the first iteration
+                ratio = th.exp(log_prob - rollout_data.old_log_prob)
+
+                # clipped surrogate loss
+                policy_loss_1 = advantages * ratio
+                policy_loss_2 = advantages * th.clamp(ratio, 1 - clip_range, 1 + clip_range)
+                policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
+
+                # Logging
+                pg_losses.append(policy_loss.item())
+                clip_fraction = th.mean((th.abs(ratio - 1) > clip_range).float()).item()
+                clip_fractions.append(clip_fraction)
+
+                if self.clip_range_vf is None:
+                    # No clipping
+                    values_pred = values
+                else:
+                    # Clip the difference between old and new value
+                    # NOTE: this depends on the reward scaling
+                    values_pred = rollout_data.old_values + th.clamp(
+                        values - rollout_data.old_values, -clip_range_vf, clip_range_vf
+                    )
+                # Value loss using the TD(gae_lambda) target
+                value_loss = F.mse_loss(rollout_data.returns, values_pred)
+                value_losses.append(value_loss.item())
+
+                # Entropy loss favor exploration
+                if entropy is None:
+                    # Approximate entropy when no analytical form
+                    entropy_loss = -th.mean(-log_prob)
+                else:
+                    entropy_loss = -th.mean(entropy)
+
+                entropy_losses.append(entropy_loss.item())
+
+                loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+
+                # Calculate approximate form of reverse KL Divergence for early stopping
+                # see issue #417: https://github.com/DLR-RM/stable-baselines3/issues/417
+                # and discussion in PR #419: https://github.com/DLR-RM/stable-baselines3/pull/419
+                # and Schulman blog: http://joschu.net/blog/kl-approx.html
+                with th.no_grad():
+                    log_ratio = log_prob - rollout_data.old_log_prob
+                    approx_kl_div = th.mean((th.exp(log_ratio) - 1) - log_ratio).cpu().numpy()
+                    approx_kl_divs.append(approx_kl_div)
+
+                if self.target_kl is not None and approx_kl_div > 1.5 * self.target_kl:
+                    continue_training = False
+                    if self.verbose >= 1:
+                        print(f"Early stopping at step {epoch} due to reaching max kl: {approx_kl_div:.2f}")
+                    break
+
+                # Optimization step
+                self.policy_clone.adapt(loss, clip_norm = self.max_grad_norm)
 
             self._n_updates += 1
             if not continue_training:
@@ -316,3 +451,56 @@ class PPO(OnPolicyAlgorithm):
             reset_num_timesteps=reset_num_timesteps,
             progress_bar=progress_bar,
         )
+
+    def get_loss_rets(self, policy=None, detailed_return = False):
+        """
+        Clear out rollout buffer, calculate total loss and return over this buffer, and return it (as a tensor for backpropagation).
+        Loss is based on PPO loss, but adapted for evaluation rather than training 
+
+        par policy: a reference to the policy against which we are to evaluate our actions. Default: self.policy (this defaulting must be done by implementations)
+        par detailed_return: whether to output additional optional returns (starred returns below)
+        
+        returns loss, mean reward over episodes, *value_loss*
+        """
+        if policy is None:
+            policy = self.policy
+
+        #Extract full rollout buffer in a single batch; "batch_size=None" means this loops once only.
+        for rollout_data in self.rollout_buffer.get(batch_size=None):
+            actions = rollout_data.actions
+            if isinstance(self.action_space, spaces.Discrete):
+                # Convert discrete action from float to long
+                actions = actions.long().flatten()
+
+            values, log_prob, entropy = policy.evaluate_actions(rollout_data.observations, actions)
+            values = values.flatten()
+
+            # Normalize advantage
+            advantages = rollout_data.advantages
+            if self.normalize_advantage and len(advantages)>1:
+                advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+            # Policy gradient loss
+            policy_loss = -(advantages * log_prob).mean()
+                #^ not using PPO loss here as it doesnt make sense to clip it when evlauting it, and so we leave unclipped. BUt then also doesnt ake sense to refer to an 'old' policy; clearly this ratio is 1 (exp(0)) - so we just get loss = advantages*1 = advantages, which is not too informative right? 
+
+
+            # Value loss using the TD(gae_lambda) target
+            value_loss = F.mse_loss(rollout_data.returns, values) #no clipping for this loss function, so values_pred =values
+
+            # Entropy loss favor exploration - this loss term makes us favour increasing the entropy of the action distribution, to push us away from a constant output (or a very small number of outputted actins with high prob)
+                    #ent_coef = 0 by default in constructor, though TODO: maybe make this bigger?? idk
+            if entropy is None:
+                # Approximate entropy when no analytical form
+                entropy_loss = -th.mean(-log_prob)
+            else:
+                entropy_loss = -th.mean(entropy)
+
+            loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
+
+
+        if not detailed_return:
+            return loss, rollout_data.returns.mean()
+        else:
+            return loss, rollout_data.returns.mean(), entropy_loss, value_loss
+    #TODO: stil need to check that this function actually works decently - it is not really using the PPO loss here but maybe thats ok?

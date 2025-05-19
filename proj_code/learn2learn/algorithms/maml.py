@@ -176,7 +176,7 @@ class MAML(BaseLearner): #TODO: ideally this would also be a subclass of BasePol
                 traceback.print_exc()
                 print('learn2learn: Maybe try with allow_nograd=True and/or allow_unused=True ?')
 
-        #Clip gradients if we want to TODO: check this works
+        #Clip gradients if we want to TODO: check this works <- things seem to be training fine with this going on so I think it is working!
         if clip_norm is not None:
             gs = []
             gradient_norm =  torch.nn.utils.get_total_norm(gradients)

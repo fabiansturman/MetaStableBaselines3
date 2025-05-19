@@ -15,6 +15,9 @@ from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedul
 from stable_baselines3.common.utils import obs_as_tensor, safe_mean
 from stable_baselines3.common.vec_env import VecEnv
 
+
+from learn2learn.algorithms.maml import MAML
+
 SelfOnPolicyAlgorithm = TypeVar("SelfOnPolicyAlgorithm", bound="OnPolicyAlgorithm")
 
 
@@ -53,6 +56,12 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         Setting it to auto, the code will be run on the GPU if possible.
     :param _init_setup_model: Whether or not to build the network at the creation of the instance
     :param supported_action_spaces: The action spaces supported by the algorithm.
+
+    Meta-learning parameters:
+    :param meta_learning: Whether to wrap the policy in a MAML module in order to calculator meta-gradients over (adaptation) training of the policy
+    :param M: Number of models we adapt to the task
+    :param adapt_timesteps: Number of timesteps for each adaption (proportional to the 'number of shots' in our learning, with its conventional definition as K(-shot)= # trajectories used to learn)
+    :param eval_timesteps: Number of timesteps with which we evaluate how well a policy has adapted to a given task
     """
 
     rollout_buffer: RolloutBuffer
@@ -82,6 +91,11 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         device: Union[th.device, str] = "auto",
         _init_setup_model: bool = True,
         supported_action_spaces: Optional[tuple[type[spaces.Space], ...]] = None,
+
+        meta_learning = False,
+        M = None,
+        adapt_timesteps = None,
+        eval_timesteps = None
     ):
         super().__init__(
             policy=policy,
@@ -109,8 +123,22 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         self.rollout_buffer_class = rollout_buffer_class
         self.rollout_buffer_kwargs = rollout_buffer_kwargs or {}
 
+        self.meta_learning = meta_learning
+        if self.meta_learning:
+            #If doing meta learning, we need to ensure that the parameters for our meta learning are defined
+            assert M is not None
+            assert adapt_timesteps is not None
+            assert eval_timesteps is not None
+            
+            #Save meta learning parameters
+            self.M = M
+            self.adapt_timesteps = adapt_timesteps
+            self.eval_timesteps = eval_timesteps
+
+
         if _init_setup_model:
             self._setup_model()
+
 
     def _setup_model(self) -> None:
         self._setup_lr_schedule()
@@ -138,6 +166,11 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         self.policy = self.policy.to(self.device)
         # Warn when not using CPU with MlpPolicy
         self._maybe_recommend_cpu()
+
+        #Wrap policy in a MAML wrapper for ability to calculate meta-gradients if doing meta learning with this agent
+        if self.meta_learning:
+            self.policy = MAML(self.policy, self.learning_rate)  #TODO: make the learning rate adhere to a schedule and all training arguyments giuven in constructuror also be able to apply to meta learning, etc, like they would be otherweise (though it is less of a big deal here as in MAML we do few shot learening anyway)
+
 
     def _maybe_recommend_cpu(self, mlp_class_name: str = "ActorCriticPolicy") -> None:
         """
@@ -276,7 +309,15 @@ class OnPolicyAlgorithm(BaseAlgorithm):
 
     def train(self) -> None:
         """
-        Consume current rollout data and update policy parameters.
+        Consume current rollout data and perform single update of {self.policy} parameters.
+        Implemented by individual algorithms.
+        """
+        raise NotImplementedError
+    
+    def train_clone(self) -> None:
+        """
+        Consume current rollout data and perform single update of {self.policy_clone} parameters.
+        Performs training with the MAML update syntax, and adapts the clone.
         Implemented by individual algorithms.
         """
         raise NotImplementedError
@@ -304,18 +345,19 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             self.logger.record("rollout/success_rate", safe_mean(self.ep_success_buffer))
         self.logger.dump(step=self.num_timesteps)
 
-    def get_loss(self, policy=None):
+    def get_loss_rets(self, policy=None, detailed_return = False): #TOOO: was just called 'get_loss' so will need top update references to this function in my scripts
         """
-        Clear out rollout buffer, calculate total loss over this buffer, and return it (as a tensor for backpropagation)
+        Clear out rollout buffer, calculate total loss and return over this buffer, and return it (as a tensor for backpropagation).
+        Implemented specific to the algorithm being used.
         
-        par policy: a reference to the policy against which we are to evaluate our actions (either self.policy or self.policy_clone)
-                ^ by default, is none - and implementations should then set it to self.policy if not othgerwise specified (i.e. if left by the user as none)
+        par policy: a reference to the policy against which we are to evaluate our actions. Default: self.policy (this defaulting must be done by implementations)
+        par detailed_return: whether to output additional optional returns (depend on specific implementation)
         
-        returns loss, mean reward
+        returns loss, mean reward over episodes, *[OPTIONAL RETURNS] if {detailed return}*
         """
         return NotImplementedError
 
-    def run_meta_adaption_and_loss( #TODO: rename as meta-evaluate?
+    def evaluate_policy( #TODO: was run_meta_adaption_and_loss; need to change its usage in scripts!
             self: SelfOnPolicyAlgorithm,
             total_timesteps: int,
             reset_num_timesteps: bool = True,
@@ -328,12 +370,14 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         
         returns (mean loss,mean return) 
         """
-        if policy is None:
-            policy = self.policy_clone
+        if policy is None and self.policy_clone is not None:
+            policy = self.policy_clone #Unless otherwise specified, we will try to evaluate the cloned policy (if this cloned policy doesn't exist and no specific policy to evaluate has been specified, defaults to {self.policy})
+        else:
+            policy = self.policy
 
         
         assert self.env is not None
-        assert policy is not None #we either need pass the policy to be evaluating as a parameter to this function, or have a policy_clone in self.__dict__ that we have just trained up
+        assert policy is not None 
         
         total_timesteps, callback = self._setup_learn(
             total_timesteps,
@@ -355,7 +399,7 @@ class OnPolicyAlgorithm(BaseAlgorithm):
             self._update_current_progress_remaining(self.num_timesteps, total_timesteps)
 
 
-            delta_loss, delta_rets =  self.get_loss(policy)
+            delta_loss, delta_rets =  self.get_loss_rets(policy)
             loss += delta_loss
             rets += delta_rets
 
@@ -371,13 +415,17 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         tb_log_name: str = "OnPolicyAlgorithm",
         reset_num_timesteps: bool = True,
         progress_bar: bool = False,
-        policy = None
     ) -> SelfOnPolicyAlgorithm:
-        #Unless otherwise specfied, we collect rollouts using {self.policy} as our policy (for collecting meta-learning rollouts, we set policy=self.policy_clone)
-        if policy is None:
+        #If we are meta learning, a clone of {self.policy} will learn responses to {self.env}, else {self.policy} will learn it
+        if self.meta_learning:
+            self.policy_clone = self.policy.clone()
+            policy = self.policy_clone
+        else:
             policy = self.policy
 
 
+
+        #Now, perform learning with {policy} (either {self.policy} itself, or our fresh policy clone as applicable to whether we are meta-learning or not)
         iteration = 0
 
         total_timesteps, callback = self._setup_learn(
@@ -406,7 +454,12 @@ class OnPolicyAlgorithm(BaseAlgorithm):
                 assert self.ep_info_buffer is not None
                 self.dump_logs(iteration)
 
-            self.train()
+            
+            #train:empty the filled rollout buffer and perform update step(s) based on this, according to the algorithm implementation 
+            if not self.meta_learning:
+                self.train() #if standard learning, then just train {self.policy}
+            else:
+                self.train_clone() #if meta learning, train {self.policy_clone} to adapt this clone to the enviornment
 
         callback.on_training_end()
 
@@ -416,3 +469,49 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         state_dicts = ["policy", "policy.optimizer"]
 
         return state_dicts, []
+
+    def meta_adapt(self, task=None, M=None, adapt_timesteps = None, eval_timesteps = None):
+        """
+        Adapts M fresh clones of {self.policy} to task {task}, and then evaluating the adaptations and returning mean loss and return for adaptation, alongside the adapted models themselves too.
+        As M->infinity, this estimates the quality of the meta policy for adapting to task {task}.
+
+        :param task: Task we are to adapt to; if unspecified, we randomly generate a new one from the enviornment
+        :param M: Number of models we adapt to the task
+        :param adapt_timesteps: Number of timesteps for each adaption (proportional to the 'number of shots' in our learning, with its conventional definition as K(-shot)= # trajectories used to learn)
+        :param eval_timesteps: Number of timesteps with which we evaluate how well a policy has adapted to a given task
+
+        :return: empirical mean loss, empirical mean return, [adapted models]
+
+        """
+        #This function is for meta learning only
+        assert self.meta_learning
+
+        if task is None: 
+            #If task is not specified, randomly reset task from environment
+            self.env.env_method("reset_task")
+            task = self.env.env_method("get_task")[0] #when calling a function of a wrapped vectorised environment, we get a list of values back - but we just have one env here (TODO: confirm this will always be the case) so just get 0th
+        else:
+            #If task is specified, set the task of the enviornment to be that specified 
+            self.env.env_method("reset_task", task=task)
+        
+        #Set any unspecified meta learning parameters to be the defaults for this agent
+        if M is None: M = self.M
+        if adapt_timesteps is None: adapt_timesteps = self.adapt_timesteps
+        if eval_timesteps is None: eval_timesteps = self.eval_timesteps
+
+        #Perform adaptation M times
+        mean_loss = 0; mean_ret = 0; adapted_models = []
+        for m in range(M):
+            self.env.env_method("reset_task", task=task)#TODO: if this func is not working, could it be that the env we are dealing with is not self.env but a copy somehow?
+            self.learn(total_timesteps=adapt_timesteps) #make a clone of {self.policy} and adapt this clone to the current task
+            adapt_loss, adapt_ret = self.evaluate_policy(total_timesteps=eval_timesteps, policy=self.policy_clone) #sample {eval_timesteps} timesteps from the task using the adapted policy, and return over resultant path and loss from it
+            
+            adapted_models.append(self.policy_clone)
+            mean_loss += adapt_loss; mean_ret += adapt_ret #NOTE (space efficiency): as these losses get added, the adapted models are kept in memory until we detach the loss/ret values from the computation graph
+        
+        mean_loss/=M; mean_ret/=M
+
+        return mean_loss, mean_ret, adapted_models
+    
+
+    

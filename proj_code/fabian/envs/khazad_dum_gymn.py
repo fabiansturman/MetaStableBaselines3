@@ -25,7 +25,7 @@ from learn2learn.gym.envs.meta_env import MetaEnv
 class KhazadDum(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, task = None, #TODO: the way this class deals with tasks isnt quite the same as specified in the parent class (the task is saved in self.action_noise and the task is just a single scalar so we just store it as such, not a dictionary). Probs should adjust this.
+    def __init__(self, task = None, 
                  action_noise=0.1, max_episode_steps=32, continuous=False,
                  obs_level=1, one_hot=True, seed=None, init_state=None, safe_banks=True,
                  exp_bonus=0, per_action_bonus=True, bridge_bonus_factor=1, eval_mode=None,
@@ -48,8 +48,8 @@ class KhazadDum(gym.Env):
         self.max_speed = 1 # if self.continuous else 2
 
         self.task_dim = 1
-        self.average_noise = action_noise
-        self.action_noise = action_noise
+        self.average_noise = action_noise #this defines the distribution of the task
+        self.task = action_noise
         self.safe_banks = safe_banks
         self._max_episode_steps = max_episode_steps
         self.continuous_rewards = continuous_rewards
@@ -332,7 +332,7 @@ class KhazadDum(gym.Env):
             # r = -np.sum(np.abs(self.state_xy[1]-self.goal_state[1])) / self.H \
             #     if self.continuous_rewards else -1
             if is_noisy:
-                r -= 3 * self.action_noise
+                r -= 3 * self.task
 
             # success
             if self.goal[self.state_cell[0], self.state_cell[1]] > 0:
@@ -380,7 +380,7 @@ class KhazadDum(gym.Env):
         return self.state_xy + self.speed * direction
 
     def is_noisy(self):
-        return self.reached_dest == 0 and self.action_noise > 0 and (
+        return self.reached_dest == 0 and self.task > 0 and (
                 (not self.safe_banks) or self.location_category() == 3)
 
     def step(self, action):
@@ -392,9 +392,9 @@ class KhazadDum(gym.Env):
                 else self.step_discrete(action)
             if is_noisy:
                 next_xy[0] += random.normalvariate(
-                    0, self.action_noise * self.speed**2)
+                    0, self.task * self.speed**2)
                 next_xy[1] += random.normalvariate(
-                    0, self.action_noise * self.speed**2)
+                    0, self.task * self.speed**2)
             next_xy = np.clip(next_xy, (0, 0), (self.W-1, self.H-1))
             next_cell = np.round(next_xy).astype(int)
 
@@ -542,10 +542,10 @@ class KhazadDum(gym.Env):
     def set_task(self, task):
         if isinstance(task, np.ndarray) or  isinstance(task, list):
             task = task[0]
-        self.action_noise = task 
+        self.task = task 
 
     def get_task(self):
-        return self.action_noise
+        return self.task
 
     def sample_task(self, avg=None):
         if avg is None:
@@ -559,7 +559,7 @@ class KhazadDum(gym.Env):
 
     def reset_task(self, task=None):
         if task is None:
-            task = self.sample_tasks(1)[0]
+            task = self.sample_task()
         self.set_task(task)
         self._time = 0
         self._last_return = self._return
