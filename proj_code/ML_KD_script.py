@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 device = 'cpu'# 'cuda' #  #doing cpu as A2C with MlpPolicy (rather than CNNpolicy) in stablebaseline is faster on CPU, and the meta gradinet beign faster on GPU (even if it is) is not *that* much faster - it is about two(ish) times slower overall based on one run each with two meta iterations, so better on cpu in this case
 torch.set_default_device(device)
 #######################################################
-model_save_path = "saved_models\\19May_TestingMAML_A2C" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
+model_save_path = "saved_models/19May_TestingMAML_A2C" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
 
 import os
 os.mkdir(model_save_path)
@@ -94,7 +94,7 @@ for meta_it in tqdm(range(meta_iterations)):
     if best_meta_ret is None or meta_ret>best_meta_ret :
         best_meta_ret = meta_ret
         best_meta_ret_it = meta_it
-        torch.save(meta_agent.policy.state_dict(), f"{model_save_path}\\best_val_meta_ret") #OK to just save {model.policy} as that is all being meta-optimised
+        torch.save(meta_agent.policy.state_dict(), f"{model_save_path}/best_val_meta_ret") #OK to just save {model.policy} as that is all being meta-optimised
             #TODO: could it be that the highest return happens before the end of training because actually it then optimises loss and that gets us to the target in a way that return doesnt capture? not sure that makes sense so probs not....??? unlike loss being wierd before the critic is trained (I think thta is the source of the wierdness) return should always tell us whats good and what isnt rihgt?
 
     #Track meta_training curve
@@ -116,7 +116,7 @@ for meta_it in tqdm(range(meta_iterations)):
         plt.clf()
 
         #Save meta model
-        torch.save(meta_agent.policy.state_dict(), f"{model_save_path}\\meta_it_{meta_it}")
+        torch.save(meta_agent.policy.state_dict(), f"{model_save_path}/meta_it_{meta_it}")
 
 #torch.save(meta_agent.policy.state_dict(), f"{model_save_path}/final")
 
