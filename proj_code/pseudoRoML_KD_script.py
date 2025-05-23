@@ -73,7 +73,7 @@ best_meta_ret = None
 best_meta_ret_it = -1
 ########################
 print("Loading in model to continue training")
-meta_agent.policy.load_state_dict(torch.load(f"{"saved_models/19May_TestingPseudoRoML_A2C_2"}/final", weights_only=True)) 
+meta_agent.policy.load_state_dict(torch.load(f"saved_models/19May_TestingPseudoRoML_A2C_2/final", weights_only=True)) 
 
 #######################################################
 #Outer meta-learning loop
