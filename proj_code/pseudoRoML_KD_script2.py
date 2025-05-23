@@ -21,13 +21,13 @@ import matplotlib.pyplot as plt
 device = 'cpu'# 'cuda' #  #doing cpu as A2C with MlpPolicy (rather than CNNpolicy) in stablebaseline is faster on CPU, and the meta gradinet beign faster on GPU (even if it is) is not *that* much faster - it is about two(ish) times slower overall based on one run each with two meta iterations, so better on cpu in this case
 torch.set_default_device(device)
 #######################################################
-model_save_path = "saved_models/19May_TestingPseudoRoML_A2C_2" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
-
+model_save_path = "saved_models/19May_TestingPseudoRoML_A2C_3" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
+print(model_save_path)
 import os
 os.mkdir(model_save_path)
 #######################################################
 print("set seeds")
-seed = 0
+seed = 1
 random.seed(seed)
 torch.manual_seed(seed)
 np.random.seed(seed)
@@ -42,11 +42,11 @@ if device != 'cpu':
 #Hyperparameters
 adapt_lr =  7e-4
 meta_lr = 0.0005 
-meta_iterations = 500#500#1250
+meta_iterations = 1000#500#1250
 adapt_timesteps = 32*4 #for this enviornment, each episode is exactly 32 timesteps, so multiple of 32 means full number of eps experienced for each task
 eval_timesteps = 100
 tasks_per_loop = 40#60
-adapt_visualisations = 15
+adapt_visualisations = 30
 M=1
 
 vis_timesteps = meta_iterations//adapt_visualisations #denominator is number of visualisations we want
