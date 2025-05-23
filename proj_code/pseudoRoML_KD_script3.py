@@ -42,11 +42,11 @@ if device != 'cpu':
 #Hyperparameters
 adapt_lr =  7e-4
 meta_lr = 0.0005 
-meta_iterations = 500#500#1250
+meta_iterations = 1000#500#1250
 adapt_timesteps = 32*4 #for this enviornment, each episode is exactly 32 timesteps, so multiple of 32 means full number of eps experienced for each task
 eval_timesteps = 100
 tasks_per_loop = 40#60
-adapt_visualisations = 15
+adapt_visualisations = 30
 M=1
 
 vis_timesteps = meta_iterations//adapt_visualisations #denominator is number of visualisations we want
