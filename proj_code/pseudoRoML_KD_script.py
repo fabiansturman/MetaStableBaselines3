@@ -59,7 +59,7 @@ env = gym.make("KhazadDum-v1") # can access wrapped env with "env.unwrapped" (e.
 env.unwrapped.exp_bonus = 1; env.unwrapped.bridge_bonus_factor = 2 #this should incentivise getting to the target asap, and incentivise going onto the bridge
 
 #Pseudo-Roml - Add an offset to the sampled noise (for alpha-cvar, it is -mean* ln(alpha) by memoryless property off exponentials)
-env.unwrapped.noise_offset = -1*env.unwrapped.task*np.log(0.05)
+env.unwrapped.noise_offset = -1*env.unwrapped.task*np.log(0.025) #turned to 0.025 rather than 0.05
 
 #Make meta-policy and meta-optimiser
 meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device,
