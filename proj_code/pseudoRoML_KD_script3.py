@@ -21,8 +21,8 @@ import matplotlib.pyplot as plt
 device = 'cpu'# 'cuda' #  #doing cpu as A2C with MlpPolicy (rather than CNNpolicy) in stablebaseline is faster on CPU, and the meta gradinet beign faster on GPU (even if it is) is not *that* much faster - it is about two(ish) times slower overall based on one run each with two meta iterations, so better on cpu in this case
 torch.set_default_device(device)
 #######################################################
-model_save_path = "saved_models/19May_TestingPseudoRoML_A2C_2" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
-
+model_save_path = "saved_models/19May_TestingPseudoRoML_A2C_sanityNotReallyPseudo" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
+print(model_save_path)
 import os
 os.mkdir(model_save_path)
 #######################################################
@@ -56,10 +56,11 @@ if vis_timesteps == 0:
 #Make meta-environment
 import fabian.envs.khazad_dum_gymn 
 env = gym.make("KhazadDum-v1") # can access wrapped env with "env.unwrapped" (e.g. to reset task)
+env.unwrapped.average_noise=2
 env.unwrapped.exp_bonus = 1; env.unwrapped.bridge_bonus_factor = 2 #this should incentivise getting to the target asap, and incentivise going onto the bridge
 
 #Pseudo-Roml - Add an offset to the sampled noise (for alpha-cvar, it is -mean* ln(alpha) by memoryless property off exponentials)
-env.unwrapped.noise_offset = -1*env.unwrapped.task*np.log(0.025) #turned to 0.025 rather than 0.05
+#env.unwrapped.noise_offset = -1*env.unwrapped.task*np.log(0.025) #turned to 0.025 rather than 0.05
 
 #Make meta-policy and meta-optimiser
 meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device,
