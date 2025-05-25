@@ -21,13 +21,13 @@ import matplotlib.pyplot as plt
 device = 'cpu'# 'cuda' #  #doing cpu as A2C with MlpPolicy (rather than CNNpolicy) in stablebaseline is faster on CPU, and the meta gradinet beign faster on GPU (even if it is) is not *that* much faster - it is about two(ish) times slower overall based on one run each with two meta iterations, so better on cpu in this case
 torch.set_default_device(device)
 #######################################################
-model_save_path = "saved_models/19May_TestingPseudoRoML_A2C_3" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
+model_save_path = "saved_models/25May_TestingPseudoRoML_A2C_4" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
 print(model_save_path)
 import os
 os.mkdir(model_save_path)
 #######################################################
 print("set seeds")
-seed = 1
+seed = 0
 random.seed(seed)
 torch.manual_seed(seed)
 np.random.seed(seed)
@@ -59,10 +59,10 @@ env = gym.make("KhazadDum-v1") # can access wrapped env with "env.unwrapped" (e.
 env.unwrapped.exp_bonus = 1; env.unwrapped.bridge_bonus_factor = 2 #this should incentivise getting to the target asap, and incentivise going onto the bridge
 
 #Pseudo-Roml - Add an offset to the sampled noise (for alpha-cvar, it is -mean* ln(alpha) by memoryless property off exponentials)
-env.unwrapped.noise_offset = -1*env.unwrapped.task*np.log(0.025) #turned to 0.025 rather than 0.05
+env.unwrapped.noise_offset = -1*env.unwrapped.average_noise*np.log(0.000001) #stupid tiny, hjopefully this addition of 1.38 is enough. As it is a log, orders of mangitude smaller probs really arent much a bigger add...
 
 #Make meta-policy and meta-optimiser
-meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device,
+meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device, ent_coef=0.25,
                  meta_learning=True, M=M, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps) #we train the meta_agent to do well at adapting to new envs (i.e. meta learning) in our env distribution
 meta_opt = optim.Adam(meta_agent.policy.parameters(), lr=meta_lr)
 
@@ -71,8 +71,6 @@ meta_losses = []
 meta_rets = []
 best_meta_ret = None
 best_meta_ret_it = -1
-
-
 #######################################################
 #Outer meta-learning loop
 for meta_it in tqdm(range(meta_iterations)):
@@ -113,7 +111,7 @@ for meta_it in tqdm(range(meta_iterations)):
 
         #Qualitative plot of adapted policy
         fig, ax = plt.subplots()
-        ax = env.unwrapped.show_state(ax)    
+        ax = env.unwrapped.show_state(ax,show_task=True, text_coords=(2,1))    
         plt.savefig(f"{model_save_path}/training{meta_it}")
         plt.clf()
 
@@ -164,7 +162,7 @@ for t in tqdm(range(dim*dim)):
     #Plot this run
     x = t//dim
     y = t%dim
-    axs[x,y] = env.unwrapped.show_state(axs[x,y])    
+    axs[x,y] = env.unwrapped.show_state(axs[x,y],show_task=True, text_coords=(2,1))    
     axs[x,y].set_axis_off()
     
 plt.tight_layout()
