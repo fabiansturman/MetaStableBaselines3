@@ -62,7 +62,7 @@ env.unwrapped.exp_bonus = 1; env.unwrapped.bridge_bonus_factor = 2 #this should 
 env.unwrapped.noise_offset = -1*env.unwrapped.average_noise*np.log(0.000001) #stupid tiny, hjopefully this addition of 1.38 is enough. As it is a log, orders of mangitude smaller probs really arent much a bigger add...
 
 #Make meta-policy and meta-optimiser
-meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device, ent_coef=0.25,
+meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device, 
                  meta_learning=True, M=M, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps) #we train the meta_agent to do well at adapting to new envs (i.e. meta learning) in our env distribution
 meta_opt = optim.Adam(meta_agent.policy.parameters(), lr=meta_lr)
 
