@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 device = 'cpu'# 'cuda' #  #doing cpu as A2C with MlpPolicy (rather than CNNpolicy) in stablebaseline is faster on CPU, and the meta gradinet beign faster on GPU (even if it is) is not *that* much faster - it is about two(ish) times slower overall based on one run each with two meta iterations, so better on cpu in this case
 torch.set_default_device(device)
 #######################################################
-model_save_path = "saved_models/25May_TestingPseudoRoML_A2C_2" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
+model_save_path = "saved_models/19May_TestingPseudoRoML_A2C_2a" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
 print(model_save_path)
 import os
 os.mkdir(model_save_path)
@@ -59,7 +59,7 @@ env = gym.make("KhazadDum-v1") # can access wrapped env with "env.unwrapped" (e.
 env.unwrapped.exp_bonus = 1; env.unwrapped.bridge_bonus_factor = 2 #this should incentivise getting to the target asap, and incentivise going onto the bridge
 
 #Pseudo-Roml - Add an offset to the sampled noise (for alpha-cvar, it is -mean* ln(alpha) by memoryless property off exponentials)
-env.unwrapped.noise_offset = -1*env.unwrapped.average_noise*np.log(0.025) #turned to 0.025 rather than 0.05
+env.unwrapped.noise_offset = -1*env.unwrapped.task*np.log(0.025) #turned to 0.025 rather than 0.05
 
 #Make meta-policy and meta-optimiser
 meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device,
@@ -71,6 +71,10 @@ meta_losses = []
 meta_rets = []
 best_meta_ret = None
 best_meta_ret_it = -1
+########################
+print("Loading in model to continue training")
+meta_agent.policy.load_state_dict(torch.load(f"saved_models/19May_TestingPseudoRoML_A2C_2/final", weights_only=True)) 
+
 #######################################################
 #Outer meta-learning loop
 for meta_it in tqdm(range(meta_iterations)):
@@ -111,7 +115,7 @@ for meta_it in tqdm(range(meta_iterations)):
 
         #Qualitative plot of adapted policy
         fig, ax = plt.subplots()
-        ax = env.unwrapped.show_state(ax,show_task=True, text_coords=(2,1))    
+        ax = env.unwrapped.show_state(ax)    
         plt.savefig(f"{model_save_path}/training{meta_it}")
         plt.clf()
 
@@ -162,7 +166,7 @@ for t in tqdm(range(dim*dim)):
     #Plot this run
     x = t//dim
     y = t%dim
-    axs[x,y] = env.unwrapped.show_state(axs[x,y],show_task=True, text_coords=(2,1))    
+    axs[x,y] = env.unwrapped.show_state(axs[x,y])    
     axs[x,y].set_axis_off()
     
 plt.tight_layout()
