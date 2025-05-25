@@ -502,7 +502,7 @@ class KhazadDum(gym.Env):
 
         return im
 
-    def show_state(self, ax, color_scale=0.7, show_traj=True, traj_col='w'):
+    def show_state(self, ax, color_scale=0.7, show_traj=True, traj_col='w', show_task=False, text_coords=(0,0)):
         im = self._im_from_state(for_plot=True).swapaxes(0, 2)
         im[self.state_cell[1],self.state_cell[0],2] = 0  # remove agent square
         ax.imshow(color_scale*im)
@@ -512,6 +512,8 @@ class KhazadDum(gym.Env):
             ax.plot(track[:, 0], track[:, 1], f'{traj_col}.-')
             ax.plot(track[:1, 0], track[:1, 1], f'{traj_col}>', markersize=12)
             ax.plot(track[-1:, 0], track[-1:, 1], f'{traj_col}s', markersize=10)
+        if show_task:
+            ax.text(text_coords[0], text_coords[1], f"{self.task}")
         return ax
 
     def _set_walls(self):

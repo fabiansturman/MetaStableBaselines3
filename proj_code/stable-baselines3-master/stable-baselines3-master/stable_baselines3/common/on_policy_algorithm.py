@@ -514,5 +514,69 @@ class OnPolicyAlgorithm(BaseAlgorithm):
 
         return mean_loss, mean_ret, adapted_models
     
+    def sample_returns(self, tasks=1, repeats_per_task:int = 1, adapt_timesteps = None, eval_timesteps=None):
+        """
+        :param tasks: Either the number of tasks to sample (within which to sample rollouts), or a list of tasks to use
+        :param repeats_per_task: Number of repeated returns to sample from each task
+        :param adapt_timesteps: Number of environment timesteps with which to adapt our meta-policy to a policy instance if meta-learning (if None and metalearning, defaults to self.adapt_timesteps) 
+        :param eval_timesteps: Number of environmnet timesteps with which to evaluate our (potentially adapted) policy. If not metalearning, must be specified (as it defines the number of timesteps over which we add our return), if metalearning and None, then defaults to self.eval_timesteps
+
+TODO: I am currently not doing return based on return per rollout, instead I am doing return as defined by the functions like self.evaluate_policy and self.meta_adapt (which uses evaluate_policy). So that means my SMC is based on return over however many timesteps are specified in eval_timesteps. If tasks have fixed length then we can make it so that each loss is an single eopisodes return,but otherwise we essentailly are redefining a return to be o er a certain umber of timsteps so it all works out!!
+
+        :return: dictionary {task: [returns from rollouts from this task]}
+        """
+        if adapt_timesteps is None:
+            adapt_timesteps = self.adapt_timesteps
+        if eval_timesteps is None:
+            eval_timesteps = self.eval_timesteps
+            assert eval_timesteps is not None
+
+        #Generate tasks if only number of desired tasks given
+        if isinstance(tasks, int):
+            tasks = self.env.env_method("sample_tasks", n_tasks = tasks)
+        assert isinstance(tasks, list)
+
+        #Collect returns
+        returns = {task:[] for task in tasks}
+        for task in tasks:
+            task_returns = []
+            for _ in range(repeats_per_task):
+                if self.meta_learning:
+                    #If metalearning, we adapt to our task and get the return from that!
+                    _, ret, _ = self.meta_adapt(task=task, M=1, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps)
+                    task_returns.append(ret)
+                else:
+                    #If not metalearning, immediately evaluate {self.policy} once for our task
+                    self.env.env_method("reset_task", task=task)
+                    _, ret = self.evaluate_policy(total_timesteps=eval_timesteps, policy=self.policy)
+                    task_returns.append(ret)
+            returns[task] = task_returns
+
+        return returns
+        
+
+
+
+    def rollout_risk_SMC(self, confidence_level, no_tasks, k=0, policy = None, adapt_timesteps = None, eval_timesteps = None):
+        """
+        For {policy}, find risk bound \epsilon and performance guarantee \tilde{J} s.t. {policy} is certifiably robust with {confidence_level}.
+        Risk function is rollout risk r_R (see Chapter 2), and bounds are computed with direct Scenario Approach method (see Chapter 3)
+
+        :param confidence_level: Confidence level we desire for our PAC bound
+        :param no_tasks: Number of tasks we will sample from (1 return-sample for each task) to find PAC bound
+        :param k: we base our SMC bound on the kth order statistic of these returns. 0th order statistic=min
+        :param adapt_timesteps: Number of environment timesteps with which to adapt our meta-policy to a policy instance if meta-learning (if None and metalearning, defaults to self.adapt_timesteps) 
+        :param eval_timesteps: Number of environmnet timesteps with which to evaluate our (potentially adapted) policy. If not metalearning, must be specified (as it defines the number of timesteps over which we add our return), if metalearning and None, then defaults to self.eval_timesteps
+
+        :return: risk bound \epsilon, performance guarantee \tilde{J} 
+        """
+        #Collect {no_tasks} returns
+        returns = self.sample_returns(tasks=no_tasks, repeats_per_task=1, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps)
+        returns = [rets[0] for task, rets in returns] #turn {returns} to be just a list of returns
+        returns = sorted(returns)
+        kth_order_stat = returns[k]
+
+        raise NotImplementedError
+    
 
     
