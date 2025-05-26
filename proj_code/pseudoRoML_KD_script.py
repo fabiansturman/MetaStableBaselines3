@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 device = 'cpu'# 'cuda' #  #doing cpu as A2C with MlpPolicy (rather than CNNpolicy) in stablebaseline is faster on CPU, and the meta gradinet beign faster on GPU (even if it is) is not *that* much faster - it is about two(ish) times slower overall based on one run each with two meta iterations, so better on cpu in this case
 torch.set_default_device(device)
 #######################################################
-model_save_path = "saved_models/25May_TestingPseudoRoML_A2C_3" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
+model_save_path = "saved_models/25May_TestingPseudoRoML_A2C_3a" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
 print(model_save_path)
 import os
 os.mkdir(model_save_path)
@@ -72,6 +72,11 @@ meta_rets = []
 best_meta_ret = None
 best_meta_ret_it = -1
 #######################################################
+print("Loading in previous training, doing an extra 1000 its to get it up to 2000 its worth of training"
+meta_agent.policy.load_state_dict(torch.load("saved_models/25May_TestingPseudoRoML_A2C_3/final", weights_only=True)) 
+
+#######################################################
+
 #Outer meta-learning loop
 for meta_it in tqdm(range(meta_iterations)):
     meta_loss = 0
