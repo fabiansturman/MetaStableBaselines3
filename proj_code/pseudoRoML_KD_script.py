@@ -72,7 +72,7 @@ meta_rets = []
 best_meta_ret = None
 best_meta_ret_it = -1
 #######################################################
-print("Loading in previous training, doing an extra 1000 its to get it up to 2000 its worth of training"
+print("Loading in previous training, doing an extra 1000 its to get it up to 2000 its worth of training")
 meta_agent.policy.load_state_dict(torch.load("saved_models/25May_TestingPseudoRoML_A2C_3/final", weights_only=True)) 
 
 #######################################################
