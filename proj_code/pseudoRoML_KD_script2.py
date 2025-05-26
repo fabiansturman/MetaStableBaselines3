@@ -42,7 +42,7 @@ if device != 'cpu':
 #Hyperparameters
 adapt_lr =  7e-4
 meta_lr = 0.0005 
-meta_iterations = 1500#500#1250
+meta_iterations = 2000#500#1250
 adapt_timesteps = 32*4 #for this enviornment, each episode is exactly 32 timesteps, so multiple of 32 means full number of eps experienced for each task
 eval_timesteps = 100
 tasks_per_loop = 40#60
@@ -67,9 +67,6 @@ meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=dev
 meta_opt = optim.Adam(meta_agent.policy.parameters(), lr=meta_lr)
 
 
-#######################################################
-print("loading end of last training to continue for another 1000 its, to get to 2000 its")
-meta_agent.policy.load_state_dict(torch.load("saved_models/25May_TestingPseudoRoML_A2C_4/final", weights_only=True)) 
 
 #######################################################
 #Logging variables
