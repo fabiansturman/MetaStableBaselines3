@@ -73,7 +73,7 @@ meta_losses = []
 meta_rets = []
 best_return_past_400 = -100
 best_return_it_past_400 = -1
-best_loss_past_400 = -100
+best_loss_past_400 = 100
 best_loss_it_past_400 = -1
 
 #Outer meta-learning loop
