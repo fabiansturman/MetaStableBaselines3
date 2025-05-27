@@ -42,7 +42,7 @@ if device != 'cpu':
 #Hyperparameters
 adapt_lr =  7e-4
 meta_lr = 0.0005 
-meta_iterations = 2000#500#1250
+meta_iterations = 100#500#1250
 adapt_timesteps = 32*4 #for this enviornment, each episode is exactly 32 timesteps, so multiple of 32 means full number of eps experienced for each task
 eval_timesteps = 100
 tasks_per_loop = 40#60
