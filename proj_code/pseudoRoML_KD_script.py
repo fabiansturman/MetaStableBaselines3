@@ -55,7 +55,7 @@ if vis_timesteps == 0:
 
 #Make meta-environment
 import fabian.envs.khazad_dum_gymn 
-env = gym.make("KhazadDum-v1", continuous=True) # can access wrapped env with "env.unwrapped" (e.g. to reset task)
+env = gym.make("KhazadDum-v1", continuous=True, max_speed=0.5) # can access wrapped env with "env.unwrapped" (e.g. to reset task)
 env.unwrapped.exp_bonus = 1; env.unwrapped.bridge_bonus_factor = 2 #this should incentivise getting to the target asap, and incentivise going onto the bridge
 
 #Pseudo-Roml - Add an offset to the sampled noise (for alpha-cvar, it is -mean* ln(alpha) by memoryless property off exponentials)
