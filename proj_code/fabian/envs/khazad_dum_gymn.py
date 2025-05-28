@@ -27,7 +27,7 @@ class KhazadDum(gym.Env):
 
     def __init__(self, task = None, 
                  action_noise=0.1, noise_offset = 0, 
-                 max_episode_steps=32, continuous=False,
+                 max_episode_steps=32, continuous=False, max_speed=1,
                  obs_level=1, one_hot=True, seed=None, init_state=None, safe_banks=True,
                  exp_bonus=0, per_action_bonus=True, bridge_bonus_factor=1, eval_mode=None,
                  normalize_rewards=None, continuous_rewards=True, size=(11,9),
@@ -46,7 +46,7 @@ class KhazadDum(gym.Env):
         self.bridge1 = (2, 3)
         self.bridge2 = (self.W-4, self.W-1)
         self.obs_range = 2
-        self.max_speed = 1 # if self.continuous else 2
+        self.max_speed = max_speed # 1 if self.continuous else 2
 
         self.task_dim = 1
         self.average_noise = action_noise #this defines the distribution of the task
@@ -587,7 +587,7 @@ register(
 
 
 if __name__ == '__main__':
-    env = KhazadDum()#continuous=True)
+    env = KhazadDum(continuous=True, max_speed=1)
 
     
     for task in [env.get_task(), env.sample_tasks(1)[0]]:
