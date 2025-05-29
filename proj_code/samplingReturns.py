@@ -47,7 +47,7 @@ meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}/final", weights
 ####################################################################################
 print("Return generation for SMC: generating totally i.i.d returns")
 
-tasks=10
+tasks=100_000
 
 returns = meta_agent.sample_returns(tasks=tasks, repeats_per_task=1)
 return_list = list(returns.values())
@@ -67,7 +67,7 @@ pickle.dump(return_list, dbfile)
 ####################################################################################
 print("Return generation for SMC: generating totally batches returns from tasks ")
 
-tasks=2
+tasks=100
 
 returns = meta_agent.sample_returns(tasks=tasks, repeats_per_task=50)
 
@@ -83,30 +83,6 @@ pickle.dump(returns, dbfile)
 
 
 #############
-print("just for me to cehck its deffo the one i want rn")
+print(len(return_list))
+print(len(returns.keys()))
 
-print(return_list)
-print(returns)
-
-
-
-
-dim = 3
-fig, axs = plt.subplots(dim, dim, figsize=(10, 8))
-
-for t in tqdm(range(dim*dim)):
-    #Perform few shot adaption to environment
-    env.unwrapped.reset_task() #randomly selects task from environment to reset it to
-    meta_agent.learn(total_timesteps=adapt_timesteps) #adapt the meta agent to this task
-
-    #Test against a new trajectory from that state (else we are showing something it trained to and before the final training step)
-    meta_agent.evaluate_policy(total_timesteps=eval_timesteps)
-
-    #Plot this run
-    x = t//dim
-    y = t%dim
-    axs[x,y] = env.unwrapped.show_state(axs[x,y])    
-    axs[x,y].set_axis_off()
-    
-plt.tight_layout()
-fig.show()
