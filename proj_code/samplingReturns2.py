@@ -28,7 +28,7 @@ import pickle
 
 ####################################################################################
 print("Setting up...")
-model_save_path = "saved_models/26May_TestingPseudoRoML_A2C_3a_MAML " #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
+model_save_path = "saved_models/26May_TestingPseudoRoML_A2C_3a_MAML" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
 
 device='cpu'
 adapt_lr =  7e-4
