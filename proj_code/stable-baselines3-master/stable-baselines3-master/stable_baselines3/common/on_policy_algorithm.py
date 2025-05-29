@@ -7,6 +7,13 @@ import numpy as np
 import torch as th
 from gymnasium import spaces
 
+from scipy.optimize import fsolve
+from scipy.stats import binom
+import matplotlib.pyplot as plt
+import numpy as np
+from tqdm import tqdm
+
+
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.buffers import DictRolloutBuffer, RolloutBuffer
 from stable_baselines3.common.callbacks import BaseCallback
@@ -371,9 +378,9 @@ class OnPolicyAlgorithm(BaseAlgorithm):
         returns (mean loss,mean return) 
         """
         #If policy not specified, try to test policy clone else the main policy itself
-        if policy is None and self.policy_clone is not None:
+        if policy is None:
             policy = self.policy_clone 
-        elif policy is None and  self.policy_clone is None :
+        if policy is None:
             policy = self.policy
 
         
@@ -514,16 +521,92 @@ class OnPolicyAlgorithm(BaseAlgorithm):
 
         return mean_loss, mean_ret, adapted_models
     
-    def sample_returns(self, tasks=1, repeats_per_task:int = 1, adapt_timesteps = None, eval_timesteps=None):
+
+    ###################SMC#########################
+
+    #TODO: probs best to move these to their own module!
+    def _f_theorem1(self,epsilon,k,n,eta):
+        return binom.cdf(k, n, epsilon)- eta
+
+    def _solveEpsilon_theorem1(self,k,n,eta,max_its=100, starting_point=None):
+        starting_point = k/n if starting_point is None else _ 
+        epsilon = starting_point
+        i = max_its
+        while not (-1e-7<self._f_theorem1(epsilon, k, n, eta) < 1e-7): #error bound 1e-7
+            epsilon = fsolve(self._f_theorem1, starting_point, args=(k,n,eta))
+            starting_point /=1.05
+
+            i-=1
+            if i == 0:
+                return -1
+            
+        return epsilon
+    
+    def _theorem2_epsiloneq(self,epsilon, k,K,n, gamma, eta):
+        return (eta- binom.cdf(K-1,n-k, 1- gamma)) - binom.cdf(n-K, n, epsilon)
+
+    def _solveEpsilon_t2_manual(self,k,K,n,gamma,eta):
+        starting_point = 1
+        epsilon = starting_point
+        while epsilon<-1e4 or not (-1e-4<self._theorem2_epsiloneq(epsilon, k,K,n, gamma, eta) < 1e-4): #error bound 1e-7
+            epsilon = fsolve(self._theorem2_epsiloneq, starting_point, args=(k,K,n,gamma,eta))
+
+            starting_point -=0.001
+            if starting_point < 0:
+                return -1
+            
+        return epsilon
+
+    def _solveEpsilon_t2_auto(self,k,n,gamma,eta,max_Ks=100, progress_bar = True):
+        #Generate the list of 'K's we will search over
+        K_gap = (n-k)//max_Ks
+        if K_gap ==0:
+            K_gap = 1
+        Ks = tqdm(range(0,n-k+1,K_gap)) if progress_bar else range(0,n-k+1,K_gap)
+
+        #Iterate over our Ks, trying to solve for each
+        valid_eKpairs = [] # collects tuples (K, epsilon)
+        sol_found = False #as we increase K, if we start to not have any solutions, then we can stop early - we won't get any more solutions for even larger K
+        for K in Ks:
+            epsilon = self._solveEpsilon_t2_manual(k,K,n,gamma,eta)
+            if epsilon != -1 and epsilon != 1: #-1 or 1 indicates an error, so not worth adding to our list
+                valid_eKpairs.append((K,epsilon))
+                sol_found = True
+            elif sol_found:
+                #Once we have an error after having found some solution, then terminate the loop early; no more solutions to be found
+                break
+
+        #If no epsilons could be found, return error
+        if valid_eKpairs == []:
+            return -1
+
+        #Find the smallest (K,epsilon) pair of those tried
+        min_epsilon = 1
+        corresponding_K = None
+
+        for K,e in valid_eKpairs:
+            if e<min_epsilon: 
+                min_epsilon=e
+                corresponding_K=K
+        return corresponding_K,min_epsilon
+
+
+
+
+    def sample_returns(self, tasks=1, repeats_per_task:int = 1, adapt_timesteps = None, eval_timesteps=None, progress_bar = True):
         """
+        Sample a series of returns from the agent, with {repeats_per_task*tasks} returns sampled evenly over {tasks} tasks.
+        If Pself.meta_learning}, adapts to each task and samples returns from adapted agent, else samples task and directly runs {self.policy} on task.
+
         :param tasks: Either the number of tasks to sample (within which to sample rollouts), or a list of tasks to use
         :param repeats_per_task: Number of repeated returns to sample from each task
         :param adapt_timesteps: Number of environment timesteps with which to adapt our meta-policy to a policy instance if meta-learning (if None and metalearning, defaults to self.adapt_timesteps) 
         :param eval_timesteps: Number of environmnet timesteps with which to evaluate our (potentially adapted) policy. If not metalearning, must be specified (as it defines the number of timesteps over which we add our return), if metalearning and None, then defaults to self.eval_timesteps
-
+        :param progress_bar: Whether to display task-wise progress bar for generation of returns
+        
 TODO: I am currently not doing return based on return per rollout, instead I am doing return as defined by the functions like self.evaluate_policy and self.meta_adapt (which uses evaluate_policy). So that means my SMC is based on return over however many timesteps are specified in eval_timesteps. If tasks have fixed length then we can make it so that each loss is an single eopisodes return,but otherwise we essentailly are redefining a return to be o er a certain umber of timsteps so it all works out!!
 
-        :return: dictionary {task: [returns from rollouts from this task]}
+        :return: Dictionary {task_index:[returns]} containing the M returns for each task
         """
         if adapt_timesteps is None:
             adapt_timesteps = self.adapt_timesteps
@@ -531,14 +614,20 @@ TODO: I am currently not doing return based on return per rollout, instead I am 
             eval_timesteps = self.eval_timesteps
             assert eval_timesteps is not None
 
+
         #Generate tasks if only number of desired tasks given
         if isinstance(tasks, int):
-            tasks = self.env.env_method("sample_tasks", n_tasks = tasks)
+            tasks = self.env.env_method("sample_tasks", n_tasks = tasks)[0] #index 0, as vectorised env calls this for each env and we only have a singleton env so its nested when it neednt
         assert isinstance(tasks, list)
 
         #Collect returns
-        returns = {task:[] for task in tasks}
-        for task in tasks:
+        returns = {}
+        if progress_bar:
+            its = tqdm(range(len(tasks)))
+        else:
+            its = range(len(tasks))
+        for i in its:
+            task =tasks[i]
             task_returns = []
             for _ in range(repeats_per_task):
                 if self.meta_learning:
@@ -550,33 +639,118 @@ TODO: I am currently not doing return based on return per rollout, instead I am 
                     self.env.env_method("reset_task", task=task)
                     _, ret = self.evaluate_policy(total_timesteps=eval_timesteps, policy=self.policy)
                     task_returns.append(ret)
-            returns[task] = task_returns
+            returns[i] = task_returns
 
         return returns
         
 
-
-
-    def rollout_risk_SMC(self, confidence_level, no_tasks, k=0, policy = None, adapt_timesteps = None, eval_timesteps = None):
+    def rollout_risk_SMC(self, eta, k, return_list, max_its = 100, starting_point=None):
         """
-        For {policy}, find risk bound \epsilon and performance guarantee \tilde{J} s.t. {policy} is certifiably robust with {confidence_level}.
+        Find risk bound \epsilon and performance guarantee \\tilde{J} s.t. {policy} is certifiably robust with {confidence_level}.
         Risk function is rollout risk r_R (see Chapter 2), and bounds are computed with direct Scenario Approach method (see Chapter 3)
 
-        :param confidence_level: Confidence level we desire for our PAC bound
-        :param no_tasks: Number of tasks we will sample from (1 return-sample for each task) to find PAC bound
+        :param eta: (1-eta) is the confidence level we desire for our PAC bound (smaller eta>0 => more confident)
         :param k: we base our SMC bound on the kth order statistic of these returns. 0th order statistic=min
-        :param adapt_timesteps: Number of environment timesteps with which to adapt our meta-policy to a policy instance if meta-learning (if None and metalearning, defaults to self.adapt_timesteps) 
-        :param eval_timesteps: Number of environmnet timesteps with which to evaluate our (potentially adapted) policy. If not metalearning, must be specified (as it defines the number of timesteps over which we add our return), if metalearning and None, then defaults to self.eval_timesteps
+        :param return_list: list of i.i.d. returns [G_1,...,G_n] with which to calcualte SMC bound. Independnace means each must be taken from an i.i.d. sampled task
+        :param max_its: maxmimum number of attempts to fsolve for epsilon before giving up
+        :param starting_point: initial starting point for solving for epsilon (before halving it successively up to max_its times). If None, sets it to k/n
 
-        :return: risk bound \epsilon, performance guarantee \tilde{J} 
+        :return: risk bound \epsilon, performance guarantee \\tilde{J} 
         """
         #Collect {no_tasks} returns
-        returns = self.sample_returns(tasks=no_tasks, repeats_per_task=1, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps)
-        returns = [rets[0] for task, rets in returns] #turn {returns} to be just a list of returns
-        returns = sorted(returns)
-        kth_order_stat = returns[k]
+        returns = sorted(return_list)
+        n=len(returns)
+        guarantee = returns[k]
 
-        raise NotImplementedError
-    
+        #Solve for risk bound
+        epsilon = self._solveEpsilon_theorem1(k,n,eta,max_its=max_its, starting_point=starting_point)
 
+        return epsilon, guarantee
     
+    def task_risk_SMC_c2(self, gamma, eta, k, returns, bound, max_Ks=100, progress_bar=True):
+        """
+        Find risk bound \epsilon and performance guarantee \\tilde{J} s.t. {policy} is certifiably robust with {confidence_level}.
+        Risk function task rollout risk r_T (see Chapter 2), and bounds are computed by applying Corollary 2 to Theorem 2
+
+        :param gamma: (1-gamma) is the confidence with which we bound performance against each task
+        :param eta: (1-eta) is the confidence level we desire for our PAC bound 
+        :param k: we base our SMC bound on the kth order statistic of these returns. 0th order statistic=min
+        :param returns: dictionary {tasks: [returns sampled i.i.d from the task (conditionally indep when conditioned on task)]}
+        :param bound: tuple (a,b) s.t. each return is in [a,b] almost surely
+        :param max_Ks: (approximate) maxmimum number of values for K to check when performing our uniformly-spaced linear search for optimal K 
+        :param progress_bar: whether to display a progress bar when searching for epsilon
+        
+        :return: risk bound \epsilon, performance guarantee \\tilde{J} 
+        """
+        #Sanity check inputs
+        a,b = bound
+        tasks = list(returns.keys())
+        n = len(tasks)
+        assert n>0 #need to have at least 1 task clearly!
+        
+        r=len(returns[tasks[0]])
+        assert r>0
+        for task in tasks:
+            assert len(returns[task]) == r #this theorem assumes all tasks have had the same number of returns sampled from it (though it could be adapted to lift this assumption)
+
+        #Corollary 2: find each \tilde{J}_i
+        t2 = -1 * np.log(gamma) * np.power(b-a, 2) / (2*r)
+        t = np.sqrt(t2)
+
+        tilde_Js = [] 
+        for task in tasks:
+            tilde_Js.append(np.mean(returns[task]) - t)
+
+        #Theorem 2: find performance guarantee \tilde{J} and risk bound epsilon
+        guarantee = sorted(tilde_Js)[k] #TODO: maybe a better idea to find the kth without sorting all of them, e.g. by knocking off the minimum repeatedly.. for small k i suppose that is a better idea but for k proportional to n i suppose probs not
+        _ , epsilon = self._solveEpsilon_t2_auto(k,n,gamma,eta, max_Ks=max_Ks, progress_bar=progress_bar)
+
+        return epsilon, guarantee
+    
+    def task_risk_SMC_c3(self, gamma, eta, k, bounding_returns, guarantee_returns, max_Ks=100, progress_bar=True):
+        """
+        Find risk bound \epsilon and performance guarantee \\tilde{J} s.t. {policy} is certifiably robust with {confidence_level}.
+        Risk function task rollout risk r_T (see Chapter 2), and bounds are computed by applying Corollary 2 to Theorem 3
+
+        :param gamma: (1-gamma) is the confidence with which we bound performance against each task
+        :param eta: (1-eta) is the confidence level we desire for our PAC bound
+        :param bounding_returns: a list of returns sampled i.i.d (including different tasks each) to find return bounds [a,b] 
+        :param k: we base our SMC bound on the kth order statistic of these returns. 0th order statistic=min
+        :param guarantee_returns: dictionary {tasks: [returns sampled i.i.d from the task (conditionally indep when conditioned on task)]}, for finding the performance guarantee with Hoeffding's
+        :param max_Ks: (approximate) maxmimum number of values for K to check when performing our uniformly-spaced linear search for optimal K 
+        :param progress_bar: whether to display a progress bar when searching for epsilon
+        
+        :return: risk bound \epsilon, performance guarantee \tilde{J} 
+        """
+        #Find a,b according to Lemma 2
+        a = min(bounding_returns)
+        b = max(bounding_returns)
+        n_br = len(bounding_returns)
+        x = np.power(1/n_br, n_br/(n_br-1))
+        gamma_hat = 2*(1+x-np.power(x,1/n_br))
+
+        #Find gamma for Theorem 2 using Corollary 3 (call this gamma_2 to differentiate from gamma used as input to Corollary 3)
+            #Sanity Check guarantee_returns and construct necesary variables to use theorem
+        tasks = list(guarantee_returns.keys())
+        n = len(tasks)
+        assert n>0 #need to have at least 1 task clearly!
+        r=len(guarantee_returns[tasks[0]])
+        assert r>0
+        for task in tasks:
+            assert len(guarantee_returns[task]) == r 
+
+            #Find each \tilde{J}_i
+        t2 = -1 * np.log(gamma) * np.power(b-a, 2) / (2*r)
+        t = np.sqrt(t2)
+        tilde_Js = [] 
+        for task in tasks:
+            tilde_Js.append(np.mean(guarantee_returns[task]) - t)
+
+        gamma_2 = gamma+r*gamma_hat
+        print(f"gamma_2={gamma_2}")
+
+        #Theorem 2: find performance guarantee \tilde{J} and risk bound epsilon
+        guarantee = sorted(tilde_Js)[k] 
+        _, epsilon = self._solveEpsilon_t2_auto(k,n,gamma_2,eta, max_Ks=max_Ks, progress_bar=progress_bar)
+
+        return epsilon, guarantee

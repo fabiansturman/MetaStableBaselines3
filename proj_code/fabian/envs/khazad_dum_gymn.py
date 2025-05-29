@@ -315,7 +315,7 @@ class KhazadDum(gym.Env):
                         np.sqrt(self.visit_count[i, j, k] + 1)
             self.visit_count[i, j, k] += 1
 
-            #print(f"exp_bonus getting us bonus: {bonus}")
+            #print(f"exp_bonus getting us bonus: {bonus}") 0<=bonus <=self.bridge_bonus_factor *self.exp_bonus / sqrt(visits to a given sate with a given action+1) <= self.bridge_bonus_factor*self.exp_bonus
 
         return bonus
 
@@ -326,23 +326,22 @@ class KhazadDum(gym.Env):
             r = 0
         elif self.reached_dest < 0:
             #print("-ABYSS-")
-            r = -1
+            r = -1 # for every step we are in the abyss, we have a reward of -1
         else:
             #print("-NEITHER-")
             if self.continuous_rewards:
-                r = max(-np.sum(np.abs(self.state_xy-self.goal_state)) / 5, -1)
+                r = max(-np.sum(np.abs(self.state_xy-self.goal_state)) / 5, -1) #if continuous rewards, we have a reward -1<=r<=0, bigger for further away from goal
             else:
-                r = -1
-            # r = -np.sum(np.abs(self.state_xy[1]-self.goal_state[1])) / self.H \
-            #     if self.continuous_rewards else -1
+                r = -1 #if discrete rewards, and not at goal, our reward is -1 to start with
+           
             if is_noisy:
-                r -= 3 * self.task
+                r -= 3 * self.task #more noisy tasks means less reward. reward shifted down by 3*self.task
 
             # success
             if self.goal[self.state_cell[0], self.state_cell[1]] > 0:
                 self.reached_dest = 1
                 self.path += '_done'
-                r += 5
+                r += 5 #the first time we reach the goal, we get 5 added to the reward
 
             # abyss
             if self.map[self.state_cell[0], self.state_cell[1]] < 0:
@@ -360,10 +359,11 @@ class KhazadDum(gym.Env):
             #     r -= (1-abyss_distance)
             bonus = self.get_exp_bonus(action)
             
+                 #0<=bonus <=self.bridge_bonus_factor *self.exp_bonus / sqrt(visits to a given sate with a given action+1) <= self.bridge_bonus_factor*self.exp_bonus
 
         
         r += bonus
-        r /= self.normalize_rewards
+        r /= self.normalize_rewards #unless otherwise specified, this is self.max_epsiode_steps
 
         return r
 
@@ -587,7 +587,7 @@ register(
 
 
 if __name__ == '__main__':
-    env = KhazadDum(continuous=True, max_speed=1)
+    env = KhazadDum(continuous=True, max_speed=0.5)
 
     
     for task in [env.get_task(), env.sample_tasks(1)[0]]:
