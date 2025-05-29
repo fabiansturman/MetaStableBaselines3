@@ -1,3 +1,4 @@
+
 #######################################################
 #Perform imports
 import random
@@ -21,7 +22,7 @@ import matplotlib.pyplot as plt
 device = 'cpu'# 'cuda' #  #doing cpu as A2C with MlpPolicy (rather than CNNpolicy) in stablebaseline is faster on CPU, and the meta gradinet beign faster on GPU (even if it is) is not *that* much faster - it is about two(ish) times slower overall based on one run each with two meta iterations, so better on cpu in this case
 torch.set_default_device(device)
 #######################################################
-model_save_path = "saved_models/27May_MAML_A2C_KDcont3_fakeCVaR4" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
+model_save_path = "saved_models/27May_MAML_PPO_KDcont3a" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
 print(model_save_path)
 import os
 os.mkdir(model_save_path)
@@ -41,8 +42,8 @@ if device != 'cpu':
 
 #Hyperparameters
 adapt_lr =  7e-4
-meta_lr = 0.0005 
-meta_iterations = 1000#500#1250
+meta_lr = 0.001
+meta_iterations = 200#500#1250
 adapt_timesteps = 32*4 #for this enviornment, each episode is exactly 32 timesteps, so multiple of 32 means full number of eps experienced for each task
 eval_timesteps = 100
 tasks_per_loop = 40#60
@@ -55,14 +56,14 @@ if vis_timesteps == 0:
 
 #Make meta-environment
 import fabian.envs.khazad_dum_gymn 
-env = gym.make("KhazadDum-v1", continuous=True, max_speed=0.5, action_noise=2) # can access wrapped env with "env.unwrapped" (e.g. to reset task)
+env = gym.make("KhazadDum-v1", continuous=True, max_speed=0.5) # can access wrapped env with "env.unwrapped" (e.g. to reset task)
 env.unwrapped.exp_bonus = 1; env.unwrapped.bridge_bonus_factor = 2 #this should incentivise getting to the target asap, and incentivise going onto the bridge
 
 #Pseudo-Roml - Add an offset to the sampled noise (for alpha-cvar, it is -mean* ln(alpha) by memoryless property off exponentials)
 #env.unwrapped.noise_offset = -1*env.unwrapped.average_noise*np.log(0.025) 
 
 #Make meta-policy and meta-optimiser
-meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device, ent_coef=0.05,
+meta_agent = PPO("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device, ent_coef=0.05,
                  meta_learning=True, M=M, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps) #we train the meta_agent to do well at adapting to new envs (i.e. meta learning) in our env distribution
 meta_opt = optim.Adam(meta_agent.policy.parameters(), lr=meta_lr)
 
@@ -71,8 +72,7 @@ meta_opt = optim.Adam(meta_agent.policy.parameters(), lr=meta_lr)
 #Logging variables
 meta_losses = []
 meta_rets = []
-point_beyond_which_track_bestretsandlosses = 600
-best_return_past_400 = -100 #maybe 400, else whatveer this point is!
+best_return_past_400 = -100
 best_return_it_past_400 = -1
 best_loss_past_400 = 100
 best_loss_it_past_400 = -1
@@ -96,15 +96,15 @@ for meta_it in tqdm(range(meta_iterations)):
     meta_opt.step()
 
     #Save(/override) the best performing model(s) (w.r.t performance against adaptation task set)
-    if meta_it >=point_beyond_which_track_bestretsandlosses and meta_ret>=best_return_past_400: #ret and loss starts pretty good as the model is not trained but the actual performance is not all that so only do this after a little burnin
+    if meta_it >=400 and meta_ret>=best_return_past_400: #ret and loss starts pretty good as the model is not trained but the actual performance is not all that so only do this after a little burnin
                 #We do>= rather than > to bias towards more recent models, assuming extra stuff has been learnt since that maybe isnt capotured by the metric we are using 
         best_return_past_400 = meta_ret
         best_return_it_past_400 = meta_it
-        torch.save(meta_agent.policy.state_dict(), f"{model_save_path}/best_val_ret_pastPmetaiterations")
-    if meta_it >=point_beyond_which_track_bestretsandlosses and meta_loss<=best_loss_past_400: #ret and loss starts pretty good as the model is not trained but the actual performance is not all that so only do this after a little burnin
+        torch.save(meta_agent.policy.state_dict(), f"{model_save_path}/best_val_ret_past400metaiterations")
+    if meta_it >=400 and meta_loss<=best_loss_past_400: #ret and loss starts pretty good as the model is not trained but the actual performance is not all that so only do this after a little burnin
         best_loss_past_400 = meta_loss
         best_loss_it_past_400 = meta_it
-        torch.save(meta_agent.policy.state_dict(), f"{model_save_path}/best_val_loss_pastPmetaiterations")
+        torch.save(meta_agent.policy.state_dict(), f"{model_save_path}/best_val_loss_past400metaiterations")
 
     
     #Track meta_training curve
@@ -182,7 +182,7 @@ plt.clf()
 print("Loading in model")
 loaded_meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device,
                  meta_learning=True, M=M, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps)
-loaded_meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}/best_val_ret_pastPmetaiterations", weights_only=True))
+loaded_meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}/best_val_ret_past400metaiterations", weights_only=True))
 
 
 print("Qualitative evaluation of loaded model")
@@ -214,7 +214,7 @@ plt.clf()
 print("Loading in model")
 loaded_meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device,
                  meta_learning=True, M=M, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps)
-loaded_meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}/best_val_loss_pastPmetaiterations", weights_only=True))
+loaded_meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}/best_val_loss_past400metaiterations", weights_only=True))
 
 
 print("Qualitative evaluation of loaded model")
