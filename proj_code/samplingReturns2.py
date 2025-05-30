@@ -47,7 +47,7 @@ meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}/final", weights
 ####################################################################################
 print("Return generation for SMC: generating totally i.i.d returns")
 
-tasks=1#100_000
+tasks=100_000
 
 returns = meta_agent.sample_returns(tasks=tasks, repeats_per_task=1)
 return_list = list(returns.values())
@@ -67,7 +67,7 @@ pickle.dump(return_list, dbfile)
 ####################################################################################
 print("Return generation for SMC: generating totally batches returns from tasks ")
 
-tasks=1##200
+tasks=200
 
 returns = meta_agent.sample_returns(tasks=tasks, repeats_per_task=50)
 
