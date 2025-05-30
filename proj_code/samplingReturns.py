@@ -28,15 +28,15 @@ import pickle
 
 ####################################################################################
 print("Setting up...")
-model_save_path = "saved_models/26May_TestingPseudoRoML_A2C_3a" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
+model_save_path = "saved_models/27May_MAML_A2C_KDcont3_ep64" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
 
 device='cpu'
 adapt_lr =  7e-4
 adapt_timesteps = 32*4 #for this enviornment, each episode is exactly 32 timesteps, so multiple of 32 means full number of eps experienced for each task
-eval_timesteps = 32 # evaluate one full epsiode at a time
+eval_timesteps = 64 # evaluate one full epsiode at a time
 M=1
 
-env = gym.make("KhazadDum-v1") # can access wrapped env with "env.unwrapped" (e.g. to reset task)
+env = gym.make("KhazadDum-v1",continuous=True, max_speed=0.5, max_episode_steps=64) # can access wrapped env with "env.unwrapped" (e.g. to reset task)
 env.unwrapped.exp_bonus = 1; env.unwrapped.bridge_bonus_factor = 2 #this should incentivise getting to the target asap, and incentivise going onto the bridge
 
 
@@ -67,7 +67,7 @@ pickle.dump(return_list, dbfile)
 ####################################################################################
 print("Return generation for SMC: generating totally batches returns from tasks ")
 
-tasks=100
+tasks=200
 
 returns = meta_agent.sample_returns(tasks=tasks, repeats_per_task=50)
 
@@ -86,3 +86,24 @@ pickle.dump(returns, dbfile)
 print(len(return_list))
 print(len(returns.keys()))
 
+###########################
+dim = 3
+fig, axs = plt.subplots(dim, dim, figsize=(10, 8))
+
+for t in tqdm(range(dim*dim)):
+    #Perform few shot adaption to environment
+    env.unwrapped.reset_task() #randomly selects task from environment to reset it to
+    _,_,adapted_policy = meta_agent.meta_adapt(task = env.unwrapped.get_task(), M=1)
+    adapted_policy = adapted_policy[0] # we set M=1 above so only 1 policy adapted here
+
+    #Test against a new trajectory from that state (else we are showing something it trained to and before the final training step)
+    meta_agent.evaluate_policy(total_timesteps=32, policy=adapted_policy)
+
+    #Plot this run
+    x = t//dim
+    y = t%dim
+    axs[x,y] = env.unwrapped.show_state(axs[x,y],show_task=True, text_coords=(2,1))    
+    axs[x,y].set_axis_off()
+
+plt.tight_layout()
+plt.show()
