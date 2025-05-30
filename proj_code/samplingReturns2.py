@@ -59,7 +59,7 @@ except:
     print("making the file")
 
 
-dbfile = open(f"{model_save_path}/iidReturnList.pickle", 'ab')
+dbfile = open(f"{model_save_path}/iidReturnList.pickle", 'wb')
 pickle.dump(return_list, dbfile)
 
 
@@ -77,7 +77,7 @@ try:
 except:
     print("making the file")
 
-dbfile = open(f"{model_save_path}/TaskwiseReturns.pickle", 'ab')
+dbfile = open(f"{model_save_path}/TaskwiseReturns.pickle", 'wb')
 pickle.dump(returns, dbfile)
 
 
