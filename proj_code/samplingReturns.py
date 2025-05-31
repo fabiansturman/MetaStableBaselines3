@@ -28,7 +28,10 @@ import pickle
 
 ####################################################################################
 print("Setting up...")
-model_save_path = "saved_models/27May_MAML_A2C_KDcont3_ep64" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
+model_save_path = "proj_code/"+"saved_models/27May_MAML_A2C_KDcont3_ep64" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
+
+
+model_save_path_rob = "proj_code/"+"saved_models/27May_MAML_A2C_KDcont3_fakeCVaR3"
 
 device='cpu'
 adapt_lr =  7e-4
@@ -44,6 +47,10 @@ meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=dev
                  meta_learning=True, M=M, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps)
 meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}/final", weights_only=True))
 
+meta_agent_rob = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device,
+                 meta_learning=True, M=M, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps)
+meta_agent_rob.policy.load_state_dict(torch.load(f"{model_save_path_rob}/final", weights_only=True))
+'''
 ####################################################################################
 print("Return generation for SMC: generating totally i.i.d returns")
 
@@ -87,23 +94,36 @@ print(len(return_list))
 print(len(returns.keys()))
 
 ###########################
-dim = 3
+'''
+dim = 4
 fig, axs = plt.subplots(dim, dim, figsize=(10, 8))
 
 for t in tqdm(range(dim*dim)):
+    x = t//dim
+    y = t%dim
+    if y ==0:
+        if x==0:
+            env.unwrapped.task=0.002
+        if x == 1:
+            env.unwrapped.task=0.126
+        if x == 2:
+            env.unwrapped.task=0.452
+        if x == 3:
+            env.unwrapped.task=1.354
+        axs[y,x].set_title(f"Task {env.unwrapped.task}")
+    agent = meta_agent if y in [0,1] else  meta_agent_rob
+
+
     #Perform few shot adaption to environment
-    env.unwrapped.reset_task() #randomly selects task from environment to reset it to
-    _,_,adapted_policy = meta_agent.meta_adapt(task = env.unwrapped.get_task(), M=1)
+    _,_,adapted_policy = agent.meta_adapt(task = env.unwrapped.get_task(), M=1)
     adapted_policy = adapted_policy[0] # we set M=1 above so only 1 policy adapted here
 
     #Test against a new trajectory from that state (else we are showing something it trained to and before the final training step)
-    meta_agent.evaluate_policy(total_timesteps=32, policy=adapted_policy)
+    agent.evaluate_policy(total_timesteps=32, policy=adapted_policy)
 
     #Plot this run
-    x = t//dim
-    y = t%dim
-    axs[x,y] = env.unwrapped.show_state(axs[x,y],show_task=True, text_coords=(2,1))    
-    axs[x,y].set_axis_off()
+    axs[y,x] = env.unwrapped.show_state(axs[y,x],show_task=False, text_coords=(2,1))    
+    axs[y,x].set_axis_off()
 
 plt.tight_layout()
 plt.show()
