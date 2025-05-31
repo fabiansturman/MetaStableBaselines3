@@ -26,8 +26,6 @@ import matplotlib.pyplot as plt
 import pickle
 
 
-####################################################################################
-print("Setting up...")
 model_save_path = "saved_models/27May_MAML_A2C_KDcont3_fakeCVaR3" #simulatenously testing my new maml syntax out and doing PPO (if somethings up, then try A2C with my new maml syntax to see if its my PPO that is wrong or the MAML syntax (too?))
 
 device='cpu'
@@ -40,70 +38,32 @@ env = gym.make("KhazadDum-v1",continuous=True, max_speed=0.5, max_episode_steps=
 env.unwrapped.exp_bonus = 1; env.unwrapped.bridge_bonus_factor = 2 #this should incentivise getting to the target asap, and incentivise going onto the bridge
 
 
-meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device,
-                 meta_learning=True, M=M, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps)
-meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}/final", weights_only=True))
 
-####################################################################################
-print("Return generation for SMC: generating totally i.i.d returns")
+its = [0,100,200,300]#,400,500,600,700,800,900]
 
-tasks=100_000
-
-returns = meta_agent.sample_returns(tasks=tasks, repeats_per_task=1)
-return_list = list(returns.values())
-
-try:
-    dbfile = open(f"{model_save_path}/iidReturnList.pickle", 'rb')
-    return_list=pickle.load(dbfile)+return_list
-except:
-    print("making the file")
+for it in its:
+    print(f"Getting return distribution for model at meta iteration {it}")
 
 
-dbfile = open(f"{model_save_path}/iidReturnList.pickle", 'wb')
-pickle.dump(return_list, dbfile)
+    meta_agent = A2C("MlpPolicy", env, verbose=0, learning_rate=adapt_lr, device=device,
+                    meta_learning=True, M=M, adapt_timesteps=adapt_timesteps, eval_timesteps=eval_timesteps)
+    meta_agent.policy.load_state_dict(torch.load(f"{model_save_path}/final", weights_only=True))
+
+    print("Return generation for SMC: generating totally i.i.d returns")
+
+    tasks=20_000#100_000
+
+    returns = meta_agent.sample_returns(tasks=tasks, repeats_per_task=1)
+    return_list = list(returns.values())
+
+    try:
+        dbfile = open(f"{model_save_path}/iidReturnList_metait{it}.pickle", 'rb')
+        return_list=pickle.load(dbfile)+return_list
+    except:
+        print("making the file")
 
 
+    dbfile = open(f"{model_save_path}/iidReturnList.pickle_metait{it}", 'wb')
+    pickle.dump(return_list, dbfile)
 
-####################################################################################
-print("Return generation for SMC: generating totally batches returns from tasks ")
-
-tasks=200
-
-returns = meta_agent.sample_returns(tasks=tasks, repeats_per_task=50)
-
-try:
-    dbfile = open(f"{model_save_path}/TaskwiseReturns.pickle", 'rb')
-    returns=pickle.load(dbfile) + returns
-except:
-    print("making the file")
-
-dbfile = open(f"{model_save_path}/TaskwiseReturns.pickle", 'wb')
-pickle.dump(returns, dbfile)
-
-
-
-#############
-print(len(return_list))
-print(len(returns.keys()))
-
-###########################
-dim = 3
-fig, axs = plt.subplots(dim, dim, figsize=(10, 8))
-
-for t in tqdm(range(dim*dim)):
-    #Perform few shot adaption to environment
-    env.unwrapped.reset_task() #randomly selects task from environment to reset it to
-    _,_,adapted_policy = meta_agent.meta_adapt(task = env.unwrapped.get_task(), M=1)
-    adapted_policy = adapted_policy[0] # we set M=1 above so only 1 policy adapted here
-
-    #Test against a new trajectory from that state (else we are showing something it trained to and before the final training step)
-    meta_agent.evaluate_policy(total_timesteps=32, policy=adapted_policy)
-
-    #Plot this run
-    x = t//dim
-    y = t%dim
-    axs[x,y] = env.unwrapped.show_state(axs[x,y],show_task=True, text_coords=(2,1))    
-    axs[x,y].set_axis_off()
-
-plt.tight_layout()
-plt.show()
+    print("WHEN PLOTTING CAN COMPARE TO FINAL WITH 100_000 TASKS TO GET AN APPROXIMATE BEST MODEL (IK SAME MODEL BUT STILL!)")
