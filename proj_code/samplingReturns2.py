@@ -39,7 +39,7 @@ env.unwrapped.exp_bonus = 1; env.unwrapped.bridge_bonus_factor = 2 #this should 
 
 
 
-its = [0,100,200,300]#,400,500,600,700,800,900]
+its = [400,500,600,700]#[0,100,200,300]#,800,900]
 
 for it in its:
     print(f"Getting return distribution for model at meta iteration {it}")
